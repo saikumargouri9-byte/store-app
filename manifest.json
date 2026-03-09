@@ -2,10 +2,11 @@
   "name": "Store Pro",
   "short_name": "StorePro",
   "description": "Reliance Store Data Tracking & Exception Management",
-  "start_url": "./index.html",
+  "start_url": "/store-app/",
+  "scope": "/store-app/",
   "display": "standalone",
-  "background_color": "#0f0f1a",
-  "theme_color": "#7c3aed",
+  "background_color": "#ffffff",
+  "theme_color": "#005bb5",
   "orientation": "portrait-primary",
   "icons": [
     {
