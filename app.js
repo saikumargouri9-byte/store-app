@@ -1096,93 +1096,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 const form = btn.closest('form');
                 if (!form) return;
 
-                // Try BarcodeDetector API (Chrome Android)
-                if ('BarcodeDetector' in window) {
+                // Create live scanner overlay
+                const overlay = document.createElement('div');
+                overlay.id = 'scanOverlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+                
+                const scannerContainer = document.createElement('div');
+                scannerContainer.id = 'scanner-view';
+                scannerContainer.style.cssText = 'width:90%; max-width:400px; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border: 2px solid #3b82f6;';
+                
+                const hint = document.createElement('p');
+                hint.textContent = '📷 Center the barcode in the square';
+                hint.style.cssText = 'color:white;margin-top:20px;font-size:15px;text-align:center;padding:0 20px;';
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '✕ Close Scanner';
+                closeBtn.style.cssText = 'margin-top:24px;padding:12px 28px;background:#ef4444;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer; transition: transform 0.2s;';
+                closeBtn.onmouseenter = () => closeBtn.style.transform = 'scale(1.05)';
+                closeBtn.onmouseleave = () => closeBtn.style.transform = 'scale(1)';
+
+                overlay.appendChild(scannerContainer);
+                overlay.appendChild(hint);
+                overlay.appendChild(closeBtn);
+                document.body.appendChild(overlay);
+
+                const html5QrCode = new Html5Qrcode("scanner-view");
+                const config = { fps: 15, qrbox: { width: 250, height: 150 } };
+
+                const stopScanner = async () => {
                     try {
-                        const stream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: 'environment' }
-                        });
-                        // Create live scanner overlay
-                        const overlay = document.createElement('div');
-                        overlay.id = 'scanOverlay';
-                        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
-                        const video = document.createElement('video');
-                        video.style.cssText = 'width:100%;max-width:400px;border-radius:12px;';
-                        video.srcObject = stream;
-                        video.autoplay = true;
-                        video.playsInline = true;
-                        const hint = document.createElement('p');
-                        hint.textContent = '📷 Point at barcode — auto-detecting...';
-                        hint.style.cssText = 'color:white;margin-top:20px;font-size:15px;text-align:center;padding:0 20px;';
-                        const closeBtn = document.createElement('button');
-                        closeBtn.textContent = '✕ Cancel';
-                        closeBtn.style.cssText = 'margin-top:16px;padding:12px 28px;background:#ef4444;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;';
-                        overlay.appendChild(video);
-                        overlay.appendChild(hint);
-                        overlay.appendChild(closeBtn);
-                        document.body.appendChild(overlay);
-
-                        const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a', 'upc_e'] });
-                        let scanning = true;
-
-                        closeBtn.onclick = () => {
-                            scanning = false;
-                            stream.getTracks().forEach(t => t.stop());
-                            overlay.remove();
-                        };
-
-                        const scan = async () => {
-                            if (!scanning) return;
-                            try {
-                                const codes = await detector.detect(video);
-                                if (codes.length > 0) {
-                                    const barcode = codes[0].rawValue;
-                                    scanning = false;
-                                    stream.getTracks().forEach(t => t.stop());
-                                    overlay.remove();
-                                    // Fill the target field
-                                    const targetEl = form.querySelector(`[name="${targetName}"]`);
-                                    if (targetEl) {
-                                        targetEl.value = barcode;
-                                        targetEl.dispatchEvent(new Event('input'));
-                                    }
-                                    return;
-                                }
-                            } catch (e) { }
-                            if (scanning) requestAnimationFrame(scan);
-                        };
-                        video.onloadedmetadata = () => requestAnimationFrame(scan);
-                        return;
-                    } catch (err) {
-                        console.warn('Camera access failed:', err);
-                    }
-                }
-
-                // Fallback: file input with camera
-                const fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.accept = 'image/*';
-                fileInput.capture = 'environment';
-                fileInput.onchange = async () => {
-                    if (!fileInput.files[0]) return;
-                    if ('BarcodeDetector' in window) {
-                        const img = await createImageBitmap(fileInput.files[0]);
-                        const det = new BarcodeDetector();
-                        const codes = await det.detect(img);
-                        if (codes.length > 0) {
-                            const targetEl = form.querySelector(`[name="${targetName}"]`);
-                            if (targetEl) {
-                                targetEl.value = codes[0].rawValue;
-                                targetEl.dispatchEvent(new Event('input'));
-                            }
-                        } else {
-                            alert('No barcode detected. Please try again.');
+                        if (html5QrCode.isScanning) {
+                            await html5QrCode.stop();
                         }
-                    } else {
-                        alert('Barcode scanning not supported on this device/browser.');
-                    }
+                    } catch (e) { console.warn(e); }
+                    overlay.remove();
                 };
-                fileInput.click();
+
+                closeBtn.onclick = stopScanner;
+
+                const onScanSuccess = (decodedText) => {
+                    const targetEl = form.querySelector(`[name="${targetName}"]`);
+                    if (targetEl) {
+                        targetEl.value = decodedText;
+                        targetEl.dispatchEvent(new Event('input'));
+                    }
+                    stopScanner();
+                };
+
+                try {
+                    await html5QrCode.start(
+                        { facingMode: "environment" }, 
+                        config, 
+                        onScanSuccess
+                    );
+                } catch (err) {
+                    console.error("Scanner error:", err);
+                    alert("Camera Permission Error: Please allow camera access in your settings.");
+                    stopScanner();
+                }
             });
         });
     }
