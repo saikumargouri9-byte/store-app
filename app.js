@@ -1099,36 +1099,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Create live scanner overlay
                 const overlay = document.createElement('div');
                 overlay.id = 'scanOverlay';
-                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
                 
                 const scannerContainer = document.createElement('div');
                 scannerContainer.id = 'scanner-view';
-                scannerContainer.style.cssText = 'width:90%; max-width:400px; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border: 2px solid #3b82f6;';
+                scannerContainer.style.cssText = 'width:100%; max-width:400px; aspect-ratio:1/1; border-radius:12px; border: 2px solid #3b82f6; background: #111; overflow: hidden;';
                 
                 const hint = document.createElement('p');
-                hint.textContent = '📷 Center the barcode in the square';
-                hint.style.cssText = 'color:white;margin-top:20px;font-size:15px;text-align:center;padding:0 20px;';
+                hint.textContent = '📷 Initializing camera...';
+                hint.style.cssText = 'color:white;margin-top:20px;font-size:14px;text-align:center;font-family: sans-serif;';
                 
+                const legacyBtn = document.createElement('button');
+                legacyBtn.textContent = '📸 Camera not opening? Use Photo Mode';
+                legacyBtn.style.cssText = 'margin-top:15px;padding:12px 20px;background:rgba(255,255,255,0.1);color:white;border:1px solid #555;border-radius:10px;font-size:14px;cursor:pointer;';
+
                 const closeBtn = document.createElement('button');
-                closeBtn.textContent = '✕ Close Scanner';
-                closeBtn.style.cssText = 'margin-top:24px;padding:12px 28px;background:#ef4444;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer; transition: transform 0.2s;';
-                closeBtn.onmouseenter = () => closeBtn.style.transform = 'scale(1.05)';
-                closeBtn.onmouseleave = () => closeBtn.style.transform = 'scale(1)';
+                closeBtn.textContent = '✕ Close';
+                closeBtn.style.cssText = 'margin-top:30px;padding:12px 40px;background:#ef4444;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;';
 
                 overlay.appendChild(scannerContainer);
                 overlay.appendChild(hint);
+                overlay.appendChild(legacyBtn);
                 overlay.appendChild(closeBtn);
                 document.body.appendChild(overlay);
 
                 const html5QrCode = new Html5Qrcode("scanner-view");
-                const config = { fps: 15, qrbox: { width: 250, height: 150 } };
-
+                
                 const stopScanner = async () => {
-                    try {
-                        if (html5QrCode.isScanning) {
-                            await html5QrCode.stop();
-                        }
-                    } catch (e) { console.warn(e); }
+                    try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch(e){}
                     overlay.remove();
                 };
 
@@ -1143,16 +1141,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     stopScanner();
                 };
 
+                // Legacy Mode Handler
+                legacyBtn.onclick = async () => {
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = 'image/*';
+                    fileInput.capture = 'environment';
+                    fileInput.onchange = async () => {
+                        if (!fileInput.files[0]) return;
+                        hint.textContent = '🔍 Scanning photo...';
+                        try {
+                            const result = await html5QrCode.scanFile(fileInput.files[0], true);
+                            onScanSuccess(result);
+                        } catch(err) {
+                            alert("No barcode found in photo. Please ensure it's clear and try again.");
+                            hint.textContent = '❌ No barcode found.';
+                        }
+                    };
+                    fileInput.click();
+                };
+
                 try {
                     await html5QrCode.start(
                         { facingMode: "environment" }, 
-                        config, 
+                        { fps: 15, qrbox: { width: 250, height: 150 } }, 
                         onScanSuccess
                     );
+                    hint.textContent = '✅ Live Camera Active. Center barcode in square.';
                 } catch (err) {
-                    console.error("Scanner error:", err);
-                    alert("Camera Permission Error: Please allow camera access in your settings.");
-                    stopScanner();
+                    console.error("Live camera failed", err);
+                    hint.textContent = '⚠️ Live camera blocked. Click "Photo Mode" below.';
+                    legacyBtn.style.background = '#3b82f6';
+                    legacyBtn.style.border = 'none';
                 }
             });
         });
