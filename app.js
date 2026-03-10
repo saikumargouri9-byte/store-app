@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz09YNGwroATWO42s0Bn1SBoVnLg1XmwQYNEzH38fDu6ZJe_u2oK5Iv8syWJW6tYoQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzJixAICDbkTqp8O5zEt0n_D_6wJgZumSz0VU6g6pBFibPDZb35VNrzslJW7GkzK9Q/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("App Initializing...");
@@ -26,6 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
             item.addEventListener('click', () => {
                 const tabId = item.getAttribute('data-tab');
                 console.log("Switching to tab:", tabId);
+                
+                if (tabId === 'performanceDashboardTab') {
+                    if (typeof fetchDashboardData === 'function') fetchDashboardData();
+                }
+                if (tabId === 'adminDashboardTab') {
+                    if (typeof fetchAdminDashboardData === 'function') fetchAdminDashboardData();
+                }
 
                 // Update Sidebar
                 navItems.forEach(nav => nav.classList.remove('active'));
@@ -144,6 +151,312 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchArticleMaster();
 
+    // --- 3.5 Dashboard Analytics ---
+    async function fetchDashboardData() {
+        const totalEl = document.getElementById('dashTotalExceptions');
+        const tbBody = document.getElementById('dashDateWiseTableBody');
+        const refreshBtnTxt = document.getElementById('refreshDashText');
+        
+        if (!totalEl || !tbBody) return;
+
+        try {
+            if (refreshBtnTxt) refreshBtnTxt.textContent = "Loading Analytics...";
+            
+            const url = new URL(SCRIPT_URL);
+            url.searchParams.append('action', 'getDashboardData');
+            
+            // Pass the currently logged-in user's ID
+            const saved = localStorage.getItem('storeUser');
+            if (saved) {
+                try {
+                    const user = JSON.parse(saved);
+                    if (user && user.empCode) {
+                        url.searchParams.append('empCode', user.empCode);
+                    }
+                } catch(e) {}
+            }
+
+            url.searchParams.append('_', Date.now());
+
+            const response = await fetch(url.toString());
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                totalEl.textContent = result.data.total;
+                
+                // Populate Table
+                tbBody.innerHTML = '';
+                const dWise = result.data.dateWise;
+                if (Object.keys(dWise).length === 0) {
+                    tbBody.innerHTML = '<tr><td colspan="2" style="padding: 20px; text-align: center; color: var(--grey-500);">No data found</td></tr>';
+                } else {
+                    for (const [date, count] of Object.entries(dWise)) {
+                        const tr = document.createElement('tr');
+                        tr.style.background = 'white';
+                        tr.style.cursor = 'default';
+                        tr.addEventListener('mouseenter', () => tr.style.background = 'var(--grey-50)');
+                        tr.addEventListener('mouseleave', () => tr.style.background = 'white');
+                        
+                        const tdDate = document.createElement('td');
+                        tdDate.style.padding = '12px';
+                        tdDate.style.borderBottom = '1px solid var(--grey-200)';
+                        tdDate.style.color = 'var(--text-dark)';
+                        tdDate.textContent = date;
+                        
+                        const tdCount = document.createElement('td');
+                        tdCount.style.padding = '12px';
+                        tdCount.style.borderBottom = '1px solid var(--grey-200)';
+                        tdCount.style.textAlign = 'center';
+                        tdCount.style.fontWeight = '600';
+                        tdCount.style.color = 'var(--blue-main)';
+                        tdCount.textContent = count;
+                        
+                        tr.appendChild(tdDate);
+                        tr.appendChild(tdCount);
+                        tbBody.appendChild(tr);
+                    }
+                }
+
+                // Populate Module Table
+                const modTbBody = document.getElementById('dashModuleWiseTableBody');
+                if (modTbBody) {
+                    modTbBody.innerHTML = '';
+                    const mWise = result.data.moduleWise || {};
+                    if (Object.keys(mWise).length === 0) {
+                        modTbBody.innerHTML = '<tr><td colspan="2" style="padding: 20px; text-align: center; color: var(--grey-500);">No data found</td></tr>';
+                    } else {
+                        for (const [moduleName, count] of Object.entries(mWise)) {
+                            const tr = document.createElement('tr');
+                            tr.style.background = 'white';
+                            tr.style.cursor = 'default';
+                            tr.addEventListener('mouseenter', () => tr.style.background = 'var(--grey-50)');
+                            tr.addEventListener('mouseleave', () => tr.style.background = 'white');
+                            
+                            const tdName = document.createElement('td');
+                            tdName.style.padding = '12px';
+                            tdName.style.borderBottom = '1px solid var(--grey-200)';
+                            tdName.style.color = 'var(--text-dark)';
+                            tdName.textContent = moduleName;
+                            
+                            const tdCount = document.createElement('td');
+                            tdCount.style.padding = '12px';
+                            tdCount.style.borderBottom = '1px solid var(--grey-200)';
+                            tdCount.style.textAlign = 'center';
+                            tdCount.style.fontWeight = '600';
+                            tdCount.style.color = 'var(--blue-main)';
+                            tdCount.textContent = count;
+                            
+                            tr.appendChild(tdName);
+                            tr.appendChild(tdCount);
+                            modTbBody.appendChild(tr);
+                        }
+                    }
+                }
+            } else {
+                totalEl.textContent = "Error";
+                tbBody.innerHTML = `<tr><td colspan="2" style="padding: 20px; text-align: center; color: #d32f2f;">Error loading data: ${result.message}</td></tr>`;
+            }
+        } catch (error) {
+            console.error("Dashboard Fetch Fail:", error);
+            totalEl.textContent = "Offline";
+            tbBody.innerHTML = '<tr><td colspan="2" style="padding: 20px; text-align: center; color: #d32f2f;">Connection Error. Check internet or redeploy.</td></tr>';
+        } finally {
+            if (refreshBtnTxt) refreshBtnTxt.textContent = "Refresh Analytics";
+        }
+    }
+
+    const refreshDashboardBtn = document.getElementById('refreshDashboardBtn');
+    if (refreshDashboardBtn) {
+        refreshDashboardBtn.addEventListener('click', fetchDashboardData);
+    }
+
+    // --- 3.6 Admin Dashboard System ---
+    let fullAdminExceptionData = [];
+
+    async function fetchAdminDashboardData() {
+        const btnRefresh = document.getElementById('btnAdminRefresh');
+        if (btnRefresh) btnRefresh.textContent = "Loading...";
+
+        try {
+            const url = new URL(SCRIPT_URL);
+            url.searchParams.append('action', 'getDashboardData');
+            url.searchParams.append('isAdmin', 'true');
+            url.searchParams.append('_', Date.now());
+
+            const res = await fetch(url.toString());
+            const json = await res.json();
+
+            if (json.status === 'success' && json.data.adminData) {
+                fullAdminExceptionData = json.data.adminData;
+                applyAdminFilters(); // Renders the dashboard
+            } else {
+                console.error("Admin fetch failed:", json.message);
+            }
+        } catch (e) {
+            console.error("Error fetching admin data", e);
+        } finally {
+            if (btnRefresh) btnRefresh.textContent = "↻ Refresh";
+        }
+    }
+
+    function applyAdminFilters() {
+        if (!fullAdminExceptionData) return;
+
+        const dateFilter = document.getElementById('adminDateFilter')?.value || 'all';
+        let filteredData = fullAdminExceptionData;
+
+        // Custom Date Handling
+        document.getElementById('adminCustomDateBox')?.classList.toggle('hidden', dateFilter !== 'custom');
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        if (dateFilter !== 'all' && dateFilter !== 'custom') {
+            filteredData = fullAdminExceptionData.filter(item => {
+                if (!item.date || item.date === 'Unknown Date') return false;
+                const d = new Date(item.date);
+                if (isNaN(d.getTime())) return false;
+                d.setHours(0,0,0,0);
+                
+                const diffTime = today - d;
+                const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+                if (dateFilter === 'today') return diffDays === 0;
+                if (dateFilter === 'yesterday') return diffDays === 1;
+                if (dateFilter === '7days') return diffDays >= 0 && diffDays <= 7;
+                if (dateFilter === '30days') return diffDays >= 0 && diffDays <= 30;
+                return true;
+            });
+        } else if (dateFilter === 'custom') {
+            const dFrom = new Date(document.getElementById('adminDateFrom')?.value || 0);
+            const dTo = new Date(document.getElementById('adminDateTo')?.value || 0);
+            if (!isNaN(dFrom) && !isNaN(dTo)) {
+                filteredData = fullAdminExceptionData.filter(item => {
+                   const d = new Date(item.date);
+                   return d >= dFrom && d <= dTo;
+                });
+            }
+        }
+
+        renderAdminDashboard(filteredData);
+    }
+
+    function renderAdminDashboard(data) {
+        // Summary
+        const uniqueStores = new Set(data.map(i => i.store)).size;
+        const uniqueLPAs = new Set(data.map(i => i.lpa)).size;
+        const totalValue = data.reduce((sum, i) => sum + i.value, 0);
+
+        const setTxt = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val; };
+        setTxt('adTotalStores', uniqueStores);
+        setTxt('adTotalLPAs', uniqueLPAs);
+        setTxt('adTotalCount', data.length);
+        setTxt('adTotalValue', totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+
+        // Aggregation Helpers
+        const aggregate = (keyExtractor) => {
+            const map = {};
+            data.forEach(item => {
+                const ky = keyExtractor(item);
+                if (!map[ky]) map[ky] = { count: 0, val: 0 };
+                map[ky].count++;
+                map[ky].val += item.value;
+            });
+            return Object.entries(map).map(e => ({ name: e[0], count: e[1].count, val: e[1].val })).sort((a,b) => b.count - a.count);
+        };
+
+        const generateTableRows = (arr, tbodyId, type) => {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            arr.slice(0, 50).forEach(row => { // Limit for UI performance
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--grey-200)';
+                if (type) {
+                    tr.style.cursor = 'pointer';
+                    tr.title = "Click to drill down";
+                    tr.addEventListener('mouseenter', () => tr.style.background = 'var(--grey-50)');
+                    tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
+                    tr.addEventListener('click', () => showAdminDrillModal(type, row.name, data));
+                }
+                tr.innerHTML = `
+                    <td style="padding: 10px; ${type ? 'color: var(--blue-main); font-weight: 600;' : ''}">${row.name}</td>
+                    <td style="padding: 10px;">${row.count}</td>
+                    <td style="padding: 10px; font-weight: 500;">₹${row.val.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        // Render Lists
+        generateTableRows(aggregate(i => i.module || 'Unknown'), 'adModuleList', 'module');
+        generateTableRows(aggregate(i => i.category || 'Unknown'), 'adCategoryList', 'category');
+        generateTableRows(aggregate(i => i.store || 'Unknown'), 'adTopStoresList', 'store');
+        generateTableRows(aggregate(i => `${i.lpa} (${i.empCode || 'Unknown'})`), 'adTopLPAsList', 'lpa');
+    }
+
+    function showAdminDrillModal(filterType, filterName, data) {
+        const modal = document.getElementById('adminDrillModal');
+        const mTitle = document.getElementById('adminModalTitle');
+        const mBody = document.getElementById('adminModalBody');
+        if (!modal || !mTitle || !mBody) return;
+
+        let items = [];
+        if (filterType === 'store') items = data.filter(i => i.store === filterName);
+        if (filterType === 'module') items = data.filter(i => (i.module || 'Unknown') === filterName);
+        if (filterType === 'category') items = data.filter(i => (i.category || 'Unknown') === filterName);
+        if (filterType === 'lpa') items = data.filter(i => `${i.lpa} (${i.empCode || 'Unknown'})` === filterName);
+
+        mTitle.textContent = `Exception Details: ${filterName} (${items.length} records)`;
+        
+        mBody.innerHTML = '';
+        items.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 10px; border-bottom: 1px solid var(--grey-200);">${item.date}</td>
+                <td style="padding: 10px; border-bottom: 1px solid var(--grey-200);">${item.module || 'Unknown'}</td>
+                <td style="padding: 10px; border-bottom: 1px solid var(--grey-200);">${item.store}</td>
+                <td style="padding: 10px; border-bottom: 1px solid var(--grey-200);">${item.lpa}</td>
+                <td style="padding: 10px; border-bottom: 1px solid var(--grey-200);">${item.category}</td>
+                <td style="padding: 10px; border-bottom: 1px solid var(--grey-200); font-weight: 500;">₹${item.value}</td>
+            `;
+            mBody.appendChild(tr);
+        });
+
+        modal.classList.remove('hidden');
+    }
+
+    // Admin Interactivity Listeners
+    document.getElementById('adminCloseModal')?.addEventListener('click', () => document.getElementById('adminDrillModal').classList.add('hidden'));
+    document.getElementById('btnAdminRefresh')?.addEventListener('click', fetchAdminDashboardData);
+    document.getElementById('adminDateFilter')?.addEventListener('change', applyAdminFilters);
+    document.getElementById('btnAdminApplyDate')?.addEventListener('click', applyAdminFilters);
+
+    document.getElementById('btnAdminExportCSV')?.addEventListener('click', () => {
+        if (!fullAdminExceptionData || fullAdminExceptionData.length === 0) return alert('No data to export.');
+        
+        const headers = ["Date", "Store", "LPA", "EmpCode", "Category", "Value"];
+        const csvContent = [headers.join(',')];
+        
+        fullAdminExceptionData.forEach(item => {
+            const row = [
+                `"${item.date}"`, `"${item.store}"`, `"${item.lpa}"`, 
+                `"${item.empCode}"`, `"${item.category}"`, `${item.value}`
+            ];
+            csvContent.push(row.join(','));
+        });
+
+        const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Admin_Exceptions_${new Date().toISOString().slice(0,10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
     // --- 4. Reusable Lookup Helper ---
     function setupLookup(form, mapInputName, onCalc) {
         if (!form) return;
@@ -189,12 +502,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const siteNameInp = document.getElementById('siteName');
 
         const siteMap = {
-            'TXVP': 'Smart Hub - TXVP',
-            'TB18': 'Digital Store - TB18'
+            'TXVP': 'Raj Theatre Property',
+            'TB18': 'Subbarao Property'
         };
 
         if (siteCodeSel && siteNameInp) {
-            siteCodeSel.addEventListener('change', () => {
+            siteCodeSel.addEventListener('input', () => {
                 siteNameInp.value = siteMap[siteCodeSel.value] || "";
             });
         }
@@ -246,46 +559,55 @@ document.addEventListener('DOMContentLoaded', () => {
         setupLookup(recvExcForm, 'MapPerPiece', calcRecv);
         recvExcForm.querySelectorAll('input').forEach(i => i.addEventListener('input', calcRecv));
 
-        // Auto-fill TripDate, VehicleNo, and STNNo based on TripNo
-        const recvTripNo = recvExcForm.querySelector('[name="TripNo"]');
-        if (recvTripNo) {
-            recvTripNo.addEventListener('input', () => {
-                const searchTrip = recvTripNo.value.trim();
-                if (!searchTrip) return;
+        // --- Auto-fill Logic Helper (Updated for Sending Site Code & Invoice Number) ---
+        function setupAutoFill(form) {
+            if (!form) return;
 
-                let match = null;
-                // 1. Check local storage history (previously submitted)
+            const tripInput = form.querySelector('[name="TripNumber"]') || form.querySelector('[name="TripNo"]');
+            const invInput = form.querySelector('[name="InvoiceNumber"]');
+
+            const fieldsToFill = {
+                'TripDate': ['TripDate', 'Date'],
+                'TripNo': ['TripNo'],
+                'VehicleNo': ['VehicleNo'],
+                'SendingSite': ['SendingSite', 'SendingSiteCode'],
+                'SiteCode': ['SiteCode']
+            };
+
+            function doAutoFill(searchVal, searchKey) {
+                if (!searchVal) return;
                 const history = JSON.parse(localStorage.getItem('vehicleDataHistory') || '[]');
-                match = history.slice().reverse().find(entry => entry.TripNo === searchTrip);
-
-                // 2. Check current active Vehicle Data form if not found in history
-                if (!match && document.getElementById('dataForm')) {
-                    const dataForm = document.getElementById('dataForm');
-                    const activeTrip = dataForm.querySelector('[name="TripNo"]')?.value.trim();
-                    if (activeTrip && activeTrip === searchTrip) {
-                        match = {
-                            Date: dataForm.querySelector('[name="Date"]')?.value,
-                            VehicleNo: dataForm.querySelector('[name="VehicleNo"]')?.value,
-                            STNNumber: dataForm.querySelector('[name="STNNumber"]')?.value,
-                            InvoiceNumber: dataForm.querySelector('[name="InvoiceNumber"]')?.value,
-                            InwardNumber: dataForm.querySelector('[name="InwardNumber"]')?.value
-                        };
-                    }
-                }
+                const match = history.slice().reverse().find(entry =>
+                    String(entry[searchKey] || "").trim() === searchVal.trim()
+                );
 
                 if (match) {
-                    const tDate = recvExcForm.querySelector('[name="TripDate"]');
-                    const vNo = recvExcForm.querySelector('[name="VehicleNo"]');
-                    const stn = recvExcForm.querySelector('[name="STNNo"]');
-
-                    if (tDate && match.Date) tDate.value = match.Date.split('T')[0].split(' ')[0];
-                    if (vNo && match.VehicleNo) vNo.value = match.VehicleNo;
-                    if (stn && !stn.value) {
-                        stn.value = match.STNNumber || match.InvoiceNumber || match.InwardNumber || '';
-                    }
+                    console.log("Auto-fill match found:", match);
+                    Object.keys(fieldsToFill).forEach(targetName => {
+                        const el = form.querySelector(`[name="${targetName}"]`);
+                        if (el && (!el.value || el.value === '')) {
+                            const sourceKeys = fieldsToFill[targetName];
+                            for (let sKey of sourceKeys) {
+                                if (match[sKey]) {
+                                    if (el.type === 'date') {
+                                        el.value = match[sKey].split('T')[0].split(' ')[0];
+                                    } else {
+                                        el.value = match[sKey];
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    });
                 }
-            });
+            }
+
+            if (tripInput) tripInput.addEventListener('input', () => doAutoFill(tripInput.value, 'TripNo'));
+            if (invInput) invInput.addEventListener('input', () => doAutoFill(invInput.value, 'InvoiceNumber'));
         }
+
+        // Initialize Auto-fill ONLY for Receiving Exceptions tab
+        setupAutoFill(recvExcForm);
 
         recvExcForm.addEventListener('submit', (e) => handleGenericSubmit(e, recvExcForm, 'saveRecvException', 'recvExcMessage', 'submitRecvExcBtn'));
     }
@@ -322,7 +644,8 @@ document.addEventListener('DOMContentLoaded', () => {
             "Markdown Register", "Incident Register", "Store Opening & Closing Register",
             "CN Register", "Duplicate Register", "High Value Register",
             "Bulk Register", "Float Register", "CMS Register",
-            "HOTO Register", "General Inward Register", "Desial Inward register"
+            "HOTO Register", "General Inward Register", "Desial Inward register",
+            "F&V PI Register"
         ],
         'Jiomart': [
             "Cash Register", "CN Register", "Duplicate Register",
@@ -351,10 +674,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (regValForm) {
+        const registersWithItems = ['Dump Register', 'DAD Register', 'Loose Conversion Register', 'Markdown Register', 'F&V PI Register'];
+
         function calcRV() {
             const map = parseFloat(regValForm.querySelector('[name="MapPerPiece"]')?.value) || 0;
             const regQty = parseFloat(regValForm.querySelector('[name="RegisterQty"]')?.value) || 0;
             const docQty = parseFloat(regValForm.querySelector('[name="DocumentQuantity"]')?.value) || 0;
+            const selectedReg = rvRegisterName ? rvRegisterName.value : '';
 
             // Exception Qty = Register Qty - Document Qty (can be positive or negative)
             const excQty = regQty - docQty;
@@ -362,13 +688,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const excQtyEl = regValForm.querySelector('[name="ExceptionQty"]');
             const excValEl = regValForm.querySelector('[name="ExceptionValue"]');
+            const remarksEl = regValForm.querySelector('[name="OthersRemarks"]'); 
 
             if (excQtyEl) excQtyEl.value = excQty;
             if (excValEl) excValEl.value = excVal.toFixed(2);
+            
+            // Auto Remarks based on Exception Quantity Difference
+            if (remarksEl) {
+                const currentRemark = remarksEl.value;
+                const isAuto = !currentRemark || currentRemark.includes("Posting") || currentRemark === "Matched" || currentRemark === "Register Update Missing";
+                
+                if (isAuto) {
+                    if (excQty !== 0) {
+                        if (registersWithItems.includes(selectedReg)) {
+                            remarksEl.value = (excQty < 0) ? "Excess Posting" : "Short Posting";
+                        } else {
+                            remarksEl.value = "Register Update Missing";
+                        }
+                    } else if (regQty > 0 || docQty > 0) {
+                        remarksEl.value = "Matched";
+                    } else {
+                        remarksEl.value = ""; // clear if both are 0
+                    }
+                }
+            }
         }
 
         setupLookup(regValForm, 'MapPerPiece', calcRV);
         regValForm.querySelectorAll('input').forEach(i => i.addEventListener('input', calcRV));
+        
+        // Dynamically show/hide "Item Identification" depending on selected register type
+        if (rvRegisterName) {
+            rvRegisterName.addEventListener('change', () => {
+                const selectedReg = rvRegisterName.value;
+                
+                const itemSection = document.getElementById('rvItemIdentificationDiv');
+                const regQtyInput = regValForm.querySelector('[name="RegisterQty"]');
+                const docQtyInput = regValForm.querySelector('[name="DocumentQuantity"]');
+                
+                if (registersWithItems.includes(selectedReg)) {
+                    if (itemSection) itemSection.style.display = 'block';
+                    if (regQtyInput) regQtyInput.setAttribute('step', '0.001'); // allow decimals (e.g. 0.250)
+                    if (docQtyInput) docQtyInput.setAttribute('step', '0.001');
+                } else {
+                    if (itemSection) itemSection.style.display = 'none';
+                    if (regQtyInput) regQtyInput.setAttribute('step', '1'); // integer only
+                    if (docQtyInput) docQtyInput.setAttribute('step', '1');
+                    
+                    // Clear the hidden item fields
+                    const inputsToClear = ['ArticleCode', 'EanCode', 'ArticleDescription', 'MapPerPiece'];
+                    inputsToClear.forEach(name => {
+                        const el = regValForm.querySelector(`[name="${name}"]`);
+                        if (el) el.value = '';
+                    });
+                }
+                calcRV(); // Recalculate and update remarks automatically when register changes
+            });
+        }
+        
         regValForm.addEventListener('submit', (e) => handleGenericSubmit(e, regValForm, 'saveRegisterValidation', 'regValMessage', 'submitRegValBtn', ['Timestamp', 'SubmittedBy', 'StoreCode', 'Date']));
     }
 
@@ -422,6 +799,35 @@ document.addEventListener('DOMContentLoaded', () => {
         // Trigger calc on InvoiceQty, PackQty AND all manual discrepancy inputs
         qcJioForm.querySelectorAll('[name="InvoiceQty"],[name="PackQty"],.qj-calc-trigger')
             .forEach(i => i.addEventListener('input', calcQJ));
+
+        // Handle Virtual CN Radio toggles
+        const vcnRadios = qcJioForm.querySelectorAll('[name="VirtualCN"]');
+        const qcItemSec = document.getElementById('qcJioItemSec');
+        const qcDelivSec = document.getElementById('qcJioDelivSec');
+        const qcCalcSec = document.getElementById('qcJioCalcSec');
+        const qcRemarks = qcJioForm.querySelector('[name="Remarks"]');
+
+        if (vcnRadios.length > 0) {
+            vcnRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (e.target.value === 'yes') {
+                        if (qcItemSec) qcItemSec.style.display = 'none';
+                        if (qcDelivSec) qcDelivSec.style.display = 'none';
+                        if (qcCalcSec) qcCalcSec.style.display = 'none';
+                        if (qcRemarks) qcRemarks.value = 'Virtual CN generated';
+                        alert("Virtual CN generated");
+                    } else {
+                        if (qcItemSec) qcItemSec.style.display = 'block';
+                        if (qcDelivSec) qcDelivSec.style.display = 'block';
+                        if (qcCalcSec) qcCalcSec.style.display = 'block';
+                        if (qcRemarks && qcRemarks.value === 'Virtual CN generated') {
+                            qcRemarks.value = ''; 
+                        }
+                    }
+                });
+            });
+        }
+
         qcJioForm.addEventListener('submit', (e) => handleGenericSubmit(e, qcJioForm, 'saveQcJio', 'qcJioMessage', 'submitQcJioBtn', ['Timestamp', 'SubmittedBy', 'StoreCode', 'Date', 'LpaName', 'OrderNo']));
     }
 
@@ -505,12 +911,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const missing = [];
         for (let [key, val] of formData.entries()) {
             if (['ArticleCode', 'EnaCode', 'EanCode'].includes(key)) continue;
+            
+            // For Unbilled tab, ignore fields that are currently hidden
+            if (form.id === 'unbilledForm') {
+                const type = data.ExceptionType;
+                if (type === 'Unbilled' && ['CustomerName', 'CustomerGender', 'LocationFound'].includes(key)) continue;
+                if (type === 'Thefting') {
+                    if (['EmpName', 'EmpID', 'BilledNo', 'RposID'].includes(key)) continue;
+                    // Custom validation since native HTML required was removed
+                    if (key === 'LocationFound' && !val) {
+                        missing.push("location found");
+                        continue;
+                    }
+                }
+            }
+
             if (form.querySelector(`[name="${key}"]`)?.hasAttribute('required') && !val && val !== 0) {
                 const label = form.querySelector(`[name="${key}"]`)?.previousElementSibling?.textContent || key;
                 missing.push(label);
             }
         }
-        if (!data.ArticleCode && !data.EnaCode && !data.EanCode && (form.id !== 'dataForm')) {
+        let skipArticleCheck = form.id === 'dataForm';
+        
+        // Skip Article Code validation for non-item registers in Register Validation
+        if (form.id === 'regValForm') {
+            const registersWithItems = ['Dump Register', 'DAD Register', 'Loose Conversion Register', 'Markdown Register', 'F&V PI Register'];
+            if (!registersWithItems.includes(data.RegisterName)) {
+                skipArticleCheck = true;
+            }
+        }
+
+        // Skip Article Code validation for QC Jio form if Virtual CN IS Yes
+        if (form.id === 'qcJioForm') {
+            if (data.VirtualCN === 'yes') {
+                skipArticleCheck = true;
+            }
+        }
+
+        if (!data.ArticleCode && !data.EnaCode && !data.EanCode && !skipArticleCheck) {
             missing.push("Article/ENA Code");
         }
 
@@ -568,6 +1006,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 form.reset();
+                
+                // Re-populate LPA Name & Store Code after reset
+                const lpaInput = form.querySelector('input[name="LPA"], input[name="LpaName"], input[name="CheckingLpaName"]');
+                if (lpaInput && user && (user.name || user.empCode)) {
+                    lpaInput.value = user.name || user.empCode;
+                }
+                
                 // NOTE: We deliberately do NOT call resetFormDates() here.
                 // Date fields left blank after reset so the USER must choose
                 // the correct date for each new entry — past or present.
@@ -602,12 +1047,43 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDashboard(user) {
         if (loginContainer) loginContainer.classList.add('hidden');
         if (dashboard) dashboard.classList.remove('hidden');
-        // Show only the employee name — no 'Welcome,' prefix
+        
         if (welcomeText) welcomeText.textContent = user.name || user.empCode || 'User';
         if (userRole) userRole.textContent = user.role || 'Staff';
+
+        // Role-based Layout Switcher
+        const normTab = document.getElementById('navNormalDashboard');
+        const adminTab = document.getElementById('navAdminDashboard');
+        
+        const role = String(user.role || '').trim().toLowerCase();
+
+        if (role === 'admin') {
+            if (normTab) normTab.classList.add('hidden');
+            if (adminTab) {
+                adminTab.classList.remove('hidden');
+                setTimeout(() => adminTab.click(), 100);
+            }
+        } else {
+            if (normTab) normTab.classList.remove('hidden');
+            if (adminTab) adminTab.classList.add('hidden');
+        }
+
         resetFormDates();
-        // Initialize camera scanner buttons after login
         initCameraScanner();
+
+        // --- Auto-populate LPA Name & Store Code ---
+        const lpaInputs = document.querySelectorAll('input[name="LPA"], input[name="LpaName"], input[name="CheckingLpaName"]');
+        lpaInputs.forEach(input => {
+            if (user && (user.name || user.empCode)) {
+                input.value = user.name || user.empCode;
+                input.readOnly = true;
+                input.style.backgroundColor = 'var(--grey-50)';
+                input.style.color = 'var(--text-dark)';
+                input.style.fontWeight = '600';
+                input.style.cursor = 'not-allowed';
+                input.title = "Auto-filled based on login";
+            }
+        });
     }
 
     // ============================================
