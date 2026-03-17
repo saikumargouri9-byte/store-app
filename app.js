@@ -1670,6 +1670,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Segment Count Tab ---
     const segmentCountForm = document.getElementById('segmentCountForm');
     if (segmentCountForm) {
+        function calcOverallSC() {
+            const system = parseFloat(segmentCountForm.querySelector('[name="OverallSystemQty"]')?.value) || 0;
+            const physical = parseFloat(segmentCountForm.querySelector('[name="OverallPhysicalQty"]')?.value) || 0;
+            const diffEl = segmentCountForm.querySelector('[name="OverallDifferenceQty"]');
+            if (diffEl) diffEl.value = system - physical;
+        }
+
+        segmentCountForm.querySelectorAll('.sc-overall-calc-trigger').forEach(inp => {
+            inp.addEventListener('input', calcOverallSC);
+        });
+
         function calcSegmentCount(block) {
             const system = parseFloat(block.querySelector('[name="SystemCount"]')?.value) || 0;
             const physical = parseFloat(block.querySelector('[name="PhysicalCount"]')?.value) || 0;
@@ -1734,6 +1745,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (typeof initCameraScanner === 'function') initCameraScanner();
             });
+
+            // Initialize with default value (Top 5)
+            if (scNoOfItems.value > 1) {
+                scNoOfItems.dispatchEvent(new Event('input'));
+            }
         }
 
         segmentCountForm.addEventListener('submit', async (e) => {
@@ -1782,7 +1798,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 else {
                     showMessage(msgEl, "Saved successfully!", "success");
                     segmentCountForm.reset();
-                    scNoOfItems.value = "1";
+                    scNoOfItems.value = "5";
                     scNoOfItems.dispatchEvent(new Event('input'));
                 }
             } catch (err) {
