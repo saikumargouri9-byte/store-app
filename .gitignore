@@ -1,0 +1,18 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code settings
+.vscode/
+
+# Logs
+*.log
+debug_lines.txt
+
+# Temporary files
+*.tmp
+*.temp
+
+# Node (if added later)
+node_modules/
