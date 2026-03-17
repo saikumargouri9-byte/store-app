@@ -167,7 +167,7 @@ function doGet(e) {
     if (lastCol === 0) return createResponse({ status: 'error', message: 'Sheet "' + sheetName + '" has no headers. Run initialSetup from editor.' });
 
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    const noOfItems = parseInt(e.parameter['NoOfItems'] || "1");
+    const noOfItems = parseInt(e.parameter['NoOfItems'] || e.parameter['NoOfException'] || "1");
     const allParams = e.parameters;
 
     for (let i = 0; i < noOfItems; i++) {

@@ -646,82 +646,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setupAutoFill(recvExcForm);
-
         recvExcForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('recvExcMessage');
-            const btn = document.getElementById('submitRecvExcBtn');
-            const btnTxt = btn?.querySelector('.btn-text');
-            const loader = btn?.querySelector('.loader');
-
-            setLoading(true, btn, btnTxt, loader);
-            if (msgEl) msgEl.classList.add('hidden');
-
-            const blocks = itemsContainer.querySelectorAll('.recv-item-block');
-            const noOfItems = parseInt(noOfExceptionInput.value) || 1;
-            
-            // Gather shared data
-            const commonData = {};
-            const sharedInputs = recvExcForm.querySelectorAll('input:not(.recv-item-block input), select:not(.recv-item-block select)');
-            sharedInputs.forEach(inp => { if(inp.name) commonData[inp.name] = inp.value; });
-
-            const user = JSON.parse(localStorage.getItem('storeUser'));
-            const submittedBy = user ? user.empCode : "User";
-            commonData['Timestamp'] = new Date().toLocaleString();
-            commonData['SubmittedBy'] = submittedBy;
-            commonData['action'] = 'saveRecvException';
-            commonData['NoOfException'] = noOfItems; 
-
-            // Extract items
-            const itemsToSubmit = [];
-            for (let b = 0; b < blocks.length; b++) {
-                const block = blocks[b];
-                const itemData = { ...commonData };
-                let missingItem = false;
-                
-                block.querySelectorAll('input, select').forEach(inp => {
-                    if (inp.name) itemData[inp.name] = inp.value;
-                    if (inp.hasAttribute('required') && !inp.value && inp.value !== 0) missingItem = true;
-                });
-                
-                if (!itemData.ArticleCode && !itemData.EnaCode) missingItem = true;
-                
-                if (missingItem) {
-                    setLoading(false, btn, btnTxt, loader);
-                    showMessage(msgEl, `Missing information in Item ${b + 1} (Article Code/Values)`, "error");
-                    return;
-                }
-                itemsToSubmit.push(itemData);
-            }
-
-            try {
-                let anyError = false;
-                let errorMsg = '';
-                for (const itemData of itemsToSubmit) {
-                    const params = new URLSearchParams();
-                    Object.keys(itemData).forEach(k => params.append(k, itemData[k]));
-                    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
-                    const json = await res.json();
-                    if (json.status !== 'success') {
-                        anyError = true;
-                        errorMsg = json.message;
-                    }
-                }
-                
-                if (anyError) {
-                    showMessage(msgEl, "Error saving items: " + errorMsg, "error");
-                } else {
-                    showMessage(msgEl, "Saved entirely successfully!", "success");
-                    recvExcForm.reset();
-                    noOfExceptionInput.value = "1";
-                    noOfExceptionInput.dispatchEvent(new Event('input')); // resets to single block
-                }
-            } catch (err) {
-                console.error("Save error", err);
-                showMessage(msgEl, "Connection failed", "error");
-            } finally {
-                setLoading(false, btn, btnTxt, loader);
-            }
+            await handleGenericSubmit(e, recvExcForm, 'saveRecvException', 'recvExcMessage', 'submitRecvExcBtn');
+            noOfExceptionInput.value = "1";
+            noOfExceptionInput.dispatchEvent(new Event('input'));
         });
     }
 
@@ -912,83 +840,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         regValForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('regValMessage');
-            const btn = document.getElementById('submitRegValBtn');
-            const btnTxt = btn?.querySelector('.btn-text');
-            const loader = btn?.querySelector('.loader');
-
-            setLoading(true, btn, btnTxt, loader);
-            if (msgEl) msgEl.classList.add('hidden');
-
-            const blocks = rvItemsContainer.querySelectorAll('.reg-val-item-block');
-            const noOfItems = parseInt(rvNoOfExceptionInput.value) || 1;
-            const selectedReg = rvRegisterName ? rvRegisterName.value : '';
-            const isItemReg = registersWithItems.includes(selectedReg);
-            
-            // Gather shared data
-            const commonData = {};
-            const sharedInputs = regValForm.querySelectorAll('input:not(.reg-val-item-block input), select:not(.reg-val-item-block select)');
-            sharedInputs.forEach(inp => { if(inp.name) commonData[inp.name] = inp.value; });
-
-            const user = JSON.parse(localStorage.getItem('storeUser'));
-            const submittedBy = user ? user.empCode : "User";
-            commonData['Timestamp'] = new Date().toLocaleString();
-            commonData['SubmittedBy'] = submittedBy;
-            commonData['action'] = 'saveRegisterValidation';
-            commonData['NoOfException'] = noOfItems; 
-
-            // Extract items
-            const itemsToSubmit = [];
-            for (let b = 0; b < blocks.length; b++) {
-                const block = blocks[b];
-                const itemData = { ...commonData };
-                let missingItem = false;
-                
-                block.querySelectorAll('input, select').forEach(inp => {
-                    if (inp.name) itemData[inp.name] = inp.value;
-                    if (inp.hasAttribute('required') && !inp.value && inp.value !== 0) missingItem = true;
-                });
-                
-                if (isItemReg && !itemData.ArticleCode && !itemData.EanCode) missingItem = true;
-                
-                if (missingItem) {
-                    setLoading(false, btn, btnTxt, loader);
-                    showMessage(msgEl, `Missing information in Item ${b + 1}`, "error");
-                    return;
-                }
-                itemsToSubmit.push(itemData);
-            }
-
-            try {
-                let anyError = false;
-                let errorMsg = '';
-                for (const itemData of itemsToSubmit) {
-                    const params = new URLSearchParams();
-                    Object.keys(itemData).forEach(k => params.append(k, itemData[k]));
-                    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
-                    const json = await res.json();
-                    if (json.status !== 'success') {
-                        anyError = true;
-                        errorMsg = json.message;
-                    }
-                }
-                
-                if (anyError) {
-                    showMessage(msgEl, "Error saving entries: " + errorMsg, "error");
-                } else {
-                    showMessage(msgEl, "Saved successfully!", "success");
-                    regValForm.reset();
-                    rvNoOfExceptionInput.value = "1";
-                    rvNoOfExceptionInput.dispatchEvent(new Event('input')); 
-                    if (rvBusinessType) rvBusinessType.dispatchEvent(new Event('change'));
-                }
-            } catch (err) {
-                console.error("Save error", err);
-                showMessage(msgEl, "Connection failed", "error");
-            } finally {
-                setLoading(false, btn, btnTxt, loader);
-            }
+            await handleGenericSubmit(e, regValForm, 'saveRegisterValidation', 'regValMessage', 'submitRegValBtn');
+            rvNoOfExceptionInput.value = "1";
+            rvNoOfExceptionInput.dispatchEvent(new Event('input')); 
+            if (rvBusinessType) rvBusinessType.dispatchEvent(new Event('change'));
         });
     }
 
@@ -1106,90 +961,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         qcJioForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('qcJioMessage');
-            const btn = document.getElementById('submitQcJioBtn');
-            const btnTxt = btn?.querySelector('.btn-text');
-            const loader = btn?.querySelector('.loader');
-
-            setLoading(true, btn, btnTxt, loader);
-            if (msgEl) msgEl.classList.add('hidden');
-
-            const isVirtual = qcJioForm.querySelector('[name="VirtualCN"]:checked')?.value === 'yes';
-            const blocks = qjItemsContainer.querySelectorAll('.qc-jio-item-block');
-            const noOfItems = parseInt(qjNoOfExceptionInput.value) || 1;
-
-            // Gather shared data
-            const commonData = {};
-            const sharedInputs = qcJioForm.querySelectorAll('input:not(.qc-jio-item-block input), select:not(.qc-jio-item-block select)');
-            sharedInputs.forEach(inp => { 
-                if (inp.name && inp.type !== 'radio') commonData[inp.name] = inp.value;
-                if (inp.type === 'radio' && inp.checked) commonData[inp.name] = inp.value;
-            });
-
-            const user = JSON.parse(localStorage.getItem('storeUser'));
-            const submittedBy = user ? user.empCode : "User";
-            commonData['Timestamp'] = new Date().toLocaleString();
-            commonData['SubmittedBy'] = submittedBy;
-            commonData['action'] = 'saveQcJio';
-            commonData['NoOfException'] = noOfItems;
-
-            const itemsToSubmit = [];
-            
-            if (isVirtual) {
-                // If Virtual CN, just send common data once (or one dummy item)
-                itemsToSubmit.push({ ...commonData });
-            } else {
-                for (let b = 0; b < blocks.length; b++) {
-                    const block = blocks[b];
-                    const itemData = { ...commonData };
-                    let missingItem = false;
-                    
-                    block.querySelectorAll('input, select').forEach(inp => {
-                        if (inp.name) itemData[inp.name] = inp.value;
-                    });
-                    
-                    if (!itemData.ArticleCode && !itemData.EanCode) missingItem = true;
-                    
-                    if (missingItem) {
-                        setLoading(false, btn, btnTxt, loader);
-                        showMessage(msgEl, `Missing information in Item ${b + 1}`, "error");
-                        return;
-                    }
-                    itemsToSubmit.push(itemData);
-                }
-            }
-
-            try {
-                let anyError = false;
-                let errorMsg = '';
-                for (const itemData of itemsToSubmit) {
-                    const params = new URLSearchParams();
-                    Object.keys(itemData).forEach(k => params.append(k, itemData[k]));
-                    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
-                    const json = await res.json();
-                    if (json.status !== 'success') {
-                        anyError = true;
-                        errorMsg = json.message;
-                    }
-                }
-                
-                if (anyError) {
-                    showMessage(msgEl, "Error saving entries: " + errorMsg, "error");
-                } else {
-                    showMessage(msgEl, "Saved successfully!", "success");
-                    qcJioForm.reset();
-                    qjNoOfExceptionInput.value = "1";
-                    qjNoOfExceptionInput.dispatchEvent(new Event('input'));
-                    // Re-trigger radio toggle reset if needed
-                    qcJioForm.querySelector('[name="VirtualCN"][value="no"]').click();
-                }
-            } catch (err) {
-                console.error("Save error", err);
-                showMessage(msgEl, "Connection failed", "error");
-            } finally {
-                setLoading(false, btn, btnTxt, loader);
-            }
+            await handleGenericSubmit(e, qcJioForm, 'saveQcJio', 'qcJioMessage', 'submitQcJioBtn');
+            qjNoOfExceptionInput.value = "1";
+            qjNoOfExceptionInput.dispatchEvent(new Event('input'));
+            qcJioForm.querySelector('[name="VirtualCN"][value="no"]').click();
         });
     }
 
@@ -1297,73 +1072,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         unbilledForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('unbilledMessage');
-            const btn = document.getElementById('submitUnbilledBtn');
-            const btnTxt = btn?.querySelector('.btn-text');
-            const loader = btn?.querySelector('.loader');
-
-            setLoading(true, btn, btnTxt, loader);
-            if (msgEl) msgEl.classList.add('hidden');
-
-            const blocks = utItemsContainer.querySelectorAll('.ut-item-block');
-            const commonData = {};
-            const sharedInputs = unbilledForm.querySelectorAll('input:not(.ut-item-block input), select:not(.ut-item-block select)');
-            sharedInputs.forEach(inp => { 
-                if (inp.name && inp.type !== 'radio') commonData[inp.name] = inp.value;
-                if (inp.type === 'radio' && inp.checked) commonData[inp.name] = inp.value;
-            });
-
-            const user = JSON.parse(localStorage.getItem('storeUser'));
-            commonData['Timestamp'] = new Date().toLocaleString();
-            commonData['SubmittedBy'] = user ? user.empCode : "User";
-            commonData['action'] = 'saveIncident'; 
-            commonData['NoOfException'] = parseInt(utNoOfExceptionInput.value) || 1;
-
-            const itemsToSubmit = [];
-            for (let b = 0; b < blocks.length; b++) {
-                const block = blocks[b];
-                const itemData = { ...commonData };
-                
-                block.querySelectorAll('input, select').forEach(inp => {
-                    if (inp.name) itemData[inp.name] = inp.value;
-                });
-                
-                if (!itemData.ArticleCode && !itemData.EanCode) {
-                    setLoading(false, btn, btnTxt, loader);
-                    showMessage(msgEl, `Missing Article/EAN for Item ${b+1}`, "error");
-                    return;
-                }
-                itemsToSubmit.push(itemData);
-            }
-
-            try {
-                let anyError = false;
-                let errorMsg = '';
-                for (const itemData of itemsToSubmit) {
-                    const params = new URLSearchParams();
-                    Object.keys(itemData).forEach(k => params.append(k, itemData[k]));
-                    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
-                    const json = await res.json();
-                    if (json.status !== 'success') { anyError = true; errorMsg = json.message; }
-                }
-                
-                if (anyError) showMessage(msgEl, "Error saving: " + errorMsg, "error");
-                else {
-                    showMessage(msgEl, "Saved successfully!", "success");
-                    unbilledForm.reset();
-                    utNoOfExceptionInput.value = "1";
-                    utNoOfExceptionInput.dispatchEvent(new Event('input'));
-                    // Hide dynamic sections
-                    unbilledSec.classList.add('hidden');
-                    theftingSec.classList.add('hidden');
-                }
-            } catch (err) {
-                console.error(err);
-                showMessage(msgEl, "Connection failed", "error");
-            } finally {
-                setLoading(false, btn, btnTxt, loader);
-            }
+            await handleGenericSubmit(e, unbilledForm, 'saveIncident', 'unbilledMessage', 'submitUnbilledBtn');
+            // Hide dynamic sections
+            utNoOfExceptionInput.value = "1";
+            utNoOfExceptionInput.dispatchEvent(new Event('input'));
+            unbilledSec.classList.add('hidden');
+            theftingSec.classList.add('hidden');
         });
     }
 
