@@ -187,6 +187,11 @@ function doGet(e) {
                 return getVal('SendingSite') || getVal('SendingSiteCode') || getVal(h);
             }
 
+            // Fallbacks for Short Pick fields (if sheet still has old headers)
+            if (key === 'OrderedQty') return getVal('SystemCount') || getVal(key);
+            if (key === 'PickedQty') return getVal('PhysicalCount') || getVal(key);
+            if (key === 'ShortQty') return getVal('Variance') || getVal(key);
+
             // Auto-fallback for Floor Walk "Category" variations
             if (keyLower === 'category' || keyLower === 'discrepancy' || keyLower === 'discrepancycategory') {
                 return getVal('DiscrepancyCategory') || getVal(key) || getVal(h);
