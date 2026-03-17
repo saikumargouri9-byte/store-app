@@ -1626,24 +1626,21 @@
                                             <input type="text" name="ArticleDescription" readonly class="readonly-calc" placeholder="Auto-filled from master">
                                         </div>
                                         <div class="form-group">
-                                            <label>Ordered Qty</label>
-                                            <input type="number" name="OrderedQty" required placeholder="0" class="sp-calc-trigger">
+                                            <label>System Count</label>
+                                            <input type="number" name="SystemCount" required placeholder="0" class="sp-calc-trigger">
                                         </div>
                                         <div class="form-group">
-                                            <label>Picked Qty</label>
-                                            <input type="number" name="PickedQty" required placeholder="0" class="sp-calc-trigger">
+                                            <label>Physical Count</label>
+                                            <input type="number" name="PhysicalCount" required placeholder="0" class="sp-calc-trigger">
                                         </div>
                                         <div class="form-group">
-                                            <label>Short Qty</label>
-                                            <input type="number" name="ShortQty" readonly class="readonly-calc" placeholder="Auto-calculated" style="font-weight: bold; color: #f87171;">
+                                            <label>Difference (Qty)</label>
+                                            <input type="number" name="Variance" readonly class="readonly-calc" placeholder="0" style="font-weight: bold; color: #f87171;">
                                         </div>
                                         <div class="form-group">
-                                            <label>MAP per Piece (₹)</label>
-                                            <input type="number" name="MapPerPiece" readonly class="readonly-calc" placeholder="Auto-filled" step="0.01">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Short Value (₹)</label>
-                                            <input type="number" name="ShortValue" readonly class="readonly-calc" placeholder="Auto-calculated" style="font-weight: bold; color: #60a5fa;" step="0.01">
+                                            <input type="hidden" name="MapPerPiece">
+                                            <label>Shrink Value (₹)</label>
+                                            <input type="number" name="ShortValue" readonly class="readonly-calc" placeholder="0.00" style="font-weight: bold; color: #60a5fa;" step="0.01">
                                         </div>
                                         <div class="form-group" style="grid-column: span 2;">
                                             <label>Reason for Short Pick</label>

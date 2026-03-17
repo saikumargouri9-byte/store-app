@@ -1810,16 +1810,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const shortPickForm = document.getElementById('shortPickForm');
     if (shortPickForm) {
         function calcSPBlock(block) {
-            const ordered = parseFloat(block.querySelector('[name="OrderedQty"]')?.value) || 0;
-            const picked = parseFloat(block.querySelector('[name="PickedQty"]')?.value) || 0;
+            const system = parseFloat(block.querySelector('[name="SystemCount"]')?.value) || 0;
+            const physical = parseFloat(block.querySelector('[name="PhysicalCount"]')?.value) || 0;
             const map = parseFloat(block.querySelector('[name="MapPerPiece"]')?.value) || 0;
 
-            const shortQty = Math.max(0, ordered - picked);
-            const shortValue = shortQty * map;
+            const variance = physical - system;
+            const shortValue = Math.abs(variance) * map;
 
-            const sqEl = block.querySelector('[name="ShortQty"]');
+            const vEl = block.querySelector('[name="Variance"]');
             const svEl = block.querySelector('[name="ShortValue"]');
-            if (sqEl) sqEl.value = shortQty;
+            if (vEl) vEl.value = variance;
             if (svEl) svEl.value = shortValue.toFixed(2);
         }
 

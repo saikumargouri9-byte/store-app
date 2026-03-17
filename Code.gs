@@ -215,7 +215,7 @@ function createSheetWithHeaders(ss, sheetName) {
     'FashionExceptions':   ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','Location','ArticleCode','EanCode','ArticleDescription','NoHardtagQty','NoHardtagVal','DamagedQty','DamageVal','GrazingQty','GrazingVal','MapPerPiece','TotalValue','Remarks'],
     'IncidentLogs':        ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','ExceptionType','NoOfException','EmpName','EmpID','BilledNo','RposID','CustomerName','CustomerGender','LocationFound','EanCode','ArticleCode','ArticleDescription','Quantity','MapPerPiece','TotalValue'],
     'SegmentCount':        ['Timestamp','SubmittedBy','SiteCode','Date','LpaName','Segment','Category','OverallSystemQty','OverallPhysicalQty','OverallDifferenceQty','OverallShrinkValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','VarianceValue'],
-    'ShortPick':           ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OverallShortOrders','OverallShortQty','OverallShortValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','OrderedQty','PickedQty','ShortQty','MapPerPiece','ShortValue','Reason']
+    'ShortPick':           ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OverallShortOrders','OverallShortQty','OverallShortValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','ShortValue','Reason']
   };
 
   const headers = headersMap[sheetName];
