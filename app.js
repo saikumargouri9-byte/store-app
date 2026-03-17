@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzJixAICDbkTqp8O5zEt0n_D_6wJgZumSz0VU6g6pBFibPDZb35VNrzslJW7GkzK9Q/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxaJmc3OAlbPbQtcE8QTyRE5cQlviOB_bczWO5m2gWbTcBQEIrzQ4nQNFEOKEcz9m8/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("App Initializing...");
