@@ -1379,7 +1379,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (msgEl) msgEl.classList.add('hidden');
 
         const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+            if (data[key] !== undefined) {
+                if (!Array.isArray(data[key])) {
+                    data[key] = [data[key]];
+                }
+                data[key].push(value);
+            } else {
+                data[key] = value;
+            }
+        }
 
         // Validation
         const missing = [];
@@ -1461,7 +1471,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const baseUrl = SCRIPT_URL;
             const params = new URLSearchParams();
-            Object.keys(finalData).forEach(k => params.append(k, finalData[k]));
+            Object.keys(finalData).forEach(k => {
+                if (Array.isArray(finalData[k])) {
+                    finalData[k].forEach(v => params.append(k, v));
+                } else {
+                    params.append(k, finalData[k]);
+                }
+            });
 
             const res = await fetch(`${baseUrl}?${params.toString()}`, {
                 method: 'GET',
