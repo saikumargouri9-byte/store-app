@@ -146,6 +146,14 @@
                     <span class="nav-icon">🔒</span>
                     <span class="nav-text">Theft/Unbilled</span>
                 </button>
+                <button class="nav-item" data-tab="segmentCountTab">
+                    <span class="nav-icon">🗂️</span>
+                    <span class="nav-text">Segment Count</span>
+                </button>
+                <button class="nav-item" data-tab="shortPickTab">
+                    <span class="nav-icon">📦</span>
+                    <span class="nav-text">Short Pick</span>
+                </button>
                 <button class="nav-item" data-tab="performanceDashboardTab" id="navNormalDashboard">
                     <span class="nav-icon">📊</span>
                     <span class="nav-text">Dashboard</span>
@@ -1397,6 +1405,258 @@
                         </form>
                     </div> <!-- End glass-panel -->
                 </div> <!-- End unbilledTab -->
+
+                <!-- Tab: Segment Count -->
+                <div id="segmentCountTab" class="tab-panel">
+                    <div class="glass-panel form-panel">
+                        <div class="panel-header">
+                            <h2 style="color: var(--blue-dark); margin-bottom: 8px;">Segment Count</h2>
+                            <p class="panel-desc">Record physical segment/zone stock counts and variances.</p>
+                        </div>
+
+                        <form id="segmentCountForm" class="data-entry-form">
+                            <!-- General Info -->
+                            <div class="form-section">
+                                <h4 class="section-title">General Details</h4>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>Site Code</label>
+                                        <input type="text" name="SiteCode" required placeholder="Enter Code (A-Z)" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '')">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Date</label>
+                                        <input type="date" name="Date" required id="segCountDate">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>LPA Name</label>
+                                        <input type="text" name="LpaName" required placeholder="Enter Name" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Segment / Zone</label>
+                                        <input type="text" name="Segment" required placeholder="e.g. Zone A, Shelf 3">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Category</label>
+                                        <select name="Category" class="premium-select" required>
+                                            <option value="">-- Select Category --</option>
+                                            <option value="Grocery">Grocery</option>
+                                            <option value="Fashion">Fashion</option>
+                                            <option value="Electronics">Electronics</option>
+                                            <option value="Home">Home</option>
+                                            <option value="FMCG">FMCG</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                </div>
+                            </div>
+
+                            <!-- Section 2: Counting Details -->
+                            <div class="form-section">
+                                <h4 class="section-title">Counting Details</h4>
+                                <div class="form-group" style="margin-bottom: 25px;">
+                                    <label>Top Shrink Articles count (No. of Items to Record)</label>
+                                    <input type="number" id="scNoOfItems" name="NoOfItems" min="1" value="1" required class="calc-trigger" style="color: #fb923c; font-weight: bold; width: 100%; max-width: 200px;">
+                                </div>
+
+                                <div id="segmentItemsContainer">
+                                    <div class="segment-item-block" style="border: 1px solid var(--grey-200); padding: 18px; margin-bottom: 20px; border-radius: 12px; background: rgba(255,255,255,0.03); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                                        <h3 class="sc-item-block-title" style="margin-bottom: 15px; color: var(--blue-main); font-size: 1.1em; border-bottom: 1px solid var(--grey-200); padding-bottom: 8px;">Item 1 Details</h3>
+
+                                        <!-- Unified Grid for Item and Count -->
+                                        <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                                            <input type="hidden" name="MapPerPiece">
+                                            
+                                            <!-- Identification Group -->
+                                            <div class="form-group">
+                                                <label>Article Code</label>
+                                                <div class="input-with-action">
+                                                    <input type="text" name="ArticleCode" placeholder="Scan/Enter">
+                                                    <button type="button" class="scan-btn" data-target="ArticleCode" title="Scan Article Code">📷</button>
+                                                </div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>EAN Code</label>
+                                                <div class="input-with-action">
+                                                    <input type="text" name="EanCode" placeholder="Scan/Enter">
+                                                    <button type="button" class="scan-btn" data-target="EanCode" title="Scan EAN Code">📷</button>
+                                                </div>
+                                            </div>
+                                            <div class="form-group" style="grid-column: span 2;">
+                                                <label>Article Description</label>
+                                                <input type="text" name="ArticleDescription" readonly placeholder="Auto-filled" class="readonly-field" style="background: rgba(255,255,255,0.05); color: #94a3b8; cursor: not-allowed; border-color: transparent;">
+                                            </div>
+
+                                            <!-- Calculation Group -->
+                                            <div class="form-group">
+                                                <label>System Count</label>
+                                                <input type="number" name="SystemCount" required placeholder="0" class="sc-calc-trigger">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>System Value (₹)</label>
+                                                <input type="number" name="SystemValue" readonly class="readonly-calc" placeholder="0.00">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Physical Count</label>
+                                                <input type="number" name="PhysicalCount" required placeholder="0" class="sc-calc-trigger">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Physical Value (₹)</label>
+                                                <input type="number" name="PhysicalValue" readonly class="readonly-calc" placeholder="0.00">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Difference (Qty)</label>
+                                                <input type="number" name="Variance" readonly class="readonly-calc" placeholder="0" style="font-weight: bold; color: #f87171;">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Variance %</label>
+                                                <input type="number" name="VariancePct" readonly class="readonly-calc" placeholder="0.00" style="font-weight: bold; color: #fb923c;" step="0.01">
+                                            </div>
+                                            <div class="form-group" style="grid-column: span 2;">
+                                                <label>Shrink Value (₹)</label>
+                                                <input type="number" name="VarianceValue" readonly class="readonly-calc" placeholder="0.00" style="font-weight: bold; color: #ef4444; font-size: 1.1em;" step="0.01">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <!-- Remarks -->
+                            <div class="form-section">
+                                <h4 class="section-title">Remarks</h4>
+                                <div class="form-group">
+                                    <label>Remarks / Observations</label>
+                                    <input type="text" name="Remarks" placeholder="Any overall observations...">
+                                </div>
+                            </div>
+
+
+                            <div id="segmentCountMessage" class="message-box hidden" style="margin-bottom: 20px;"></div>
+
+                            <button type="submit" id="submitSegmentCountBtn" class="btn-primary" style="width: 100%; margin-top: 20px;">
+                                <span class="btn-text">Save Segment Count</span>
+                                <div class="loader hidden"></div>
+                            </button>
+                        </form>
+                    </div>
+                </div> <!-- End segmentCountTab -->
+
+                <!-- Tab: Short Pick Articles -->
+                <div id="shortPickTab" class="tab-panel">
+                    <div class="glass-panel form-panel">
+                        <div class="panel-header">
+                            <h2 style="color: var(--blue-dark); margin-bottom: 8px;">Short Pick Articles</h2>
+                            <p class="panel-desc">Record articles that were short-picked during order fulfilment.</p>
+                        </div>
+
+                        <form id="shortPickForm" class="data-entry-form">
+                            <!-- Header Info -->
+                            <div class="form-section">
+                                <h4 class="section-title">Order & Store Details</h4>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>Store Code</label>
+                                        <input type="text" name="StoreCode" required placeholder="Enter Code (A-Z)" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '')">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Date</label>
+                                        <input type="date" name="Date" required id="shortPickDate">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>LPA Name</label>
+                                        <input type="text" name="LpaName" required placeholder="Enter Name" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Order No.</label>
+                                        <div class="input-with-action">
+                                            <input type="text" name="OrderNo" required placeholder="Order #">
+                                            <button type="button" class="scan-btn" title="Scan Order No">📷</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Picker ID</label>
+                                        <input type="text" name="PickerID" placeholder="Picker ID">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Picker Name</label>
+                                        <input type="text" name="PickerName" placeholder="Picker Name" oninput="this.value = this.value.replace(/[^A-Za-z\s]/g, '')">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>No of Short Pick Items</label>
+                                        <input type="number" id="spNoOfItems" name="NoOfItems" min="1" value="1" required style="color: #fb923c; font-weight: bold;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Items Container -->
+                            <div id="shortPickItemsContainer">
+                                <div class="sp-item-block form-section" style="margin-bottom: 20px;">
+                                    <h4 class="section-title sp-item-block-title">Item 1 Details</h4>
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label>Article Code</label>
+                                            <div class="input-with-action">
+                                                <input type="text" name="ArticleCode" placeholder="Scan/Enter Code">
+                                                <button type="button" class="scan-btn" data-target="ArticleCode" title="Scan Article Code">📷</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>EAN Code</label>
+                                            <div class="input-with-action">
+                                                <input type="text" name="EanCode" placeholder="Scan Barcode">
+                                                <button type="button" class="scan-btn" data-target="EanCode" title="Scan EAN">📷</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-group" style="grid-column: span 2;">
+                                            <label>Article Description</label>
+                                            <input type="text" name="ArticleDescription" readonly class="readonly-calc" placeholder="Auto-filled from master">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Ordered Qty</label>
+                                            <input type="number" name="OrderedQty" required placeholder="0" class="sp-calc-trigger">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Picked Qty</label>
+                                            <input type="number" name="PickedQty" required placeholder="0" class="sp-calc-trigger">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Short Qty</label>
+                                            <input type="number" name="ShortQty" readonly class="readonly-calc" placeholder="Auto-calculated" style="font-weight: bold; color: #f87171;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>MAP per Piece (₹)</label>
+                                            <input type="number" name="MapPerPiece" readonly class="readonly-calc" placeholder="Auto-filled" step="0.01">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Short Value (₹)</label>
+                                            <input type="number" name="ShortValue" readonly class="readonly-calc" placeholder="Auto-calculated" style="font-weight: bold; color: #60a5fa;" step="0.01">
+                                        </div>
+                                        <div class="form-group" style="grid-column: span 2;">
+                                            <label>Reason for Short Pick</label>
+                                            <select name="Reason" class="premium-select" required>
+                                                <option value="">-- Select Reason --</option>
+                                                <option value="Out of Stock">Out of Stock</option>
+                                                <option value="Item Not Found">Item Not Found</option>
+                                                <option value="Damaged Stock">Damaged Stock</option>
+                                                <option value="Expired Stock">Expired Stock</option>
+                                                <option value="Near Expiry">Near Expiry</option>
+                                                <option value="Price Tag Missing">Price Tag Missing</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="shortPickMessage" class="message-box hidden" style="margin-bottom: 20px;"></div>
+
+                            <button type="submit" id="submitShortPickBtn" class="btn-primary" style="width: 100%; margin-top: 20px;">
+                                <span class="btn-text">Save Short Pick Record</span>
+                                <div class="loader hidden"></div>
+                            </button>
+                        </form>
+                    </div>
+                </div> <!-- End shortPickTab -->
+
             </div> <!-- End Tab Panels -->
         </section>
     </main>

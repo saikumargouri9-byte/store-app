@@ -1666,4 +1666,196 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Segment Count Tab ---
+    const segmentCountForm = document.getElementById('segmentCountForm');
+    if (segmentCountForm) {
+        function calcSegmentCount(block) {
+            const system = parseFloat(block.querySelector('[name="SystemCount"]')?.value) || 0;
+            const physical = parseFloat(block.querySelector('[name="PhysicalCount"]')?.value) || 0;
+            const map = parseFloat(block.querySelector('[name="MapPerPiece"]')?.value) || 0;
+
+            const variance = physical - system;
+            const variancePct = system !== 0 ? ((variance / system) * 100) : 0;
+
+            const setVal = (name, val) => {
+                const el = block.querySelector(`[name="${name}"]`);
+                if (el) el.value = val;
+            };
+
+            setVal('Variance', variance);
+            setVal('VariancePct', variancePct.toFixed(2));
+            setVal('SystemValue', (system * map).toFixed(2));
+            setVal('PhysicalValue', (physical * map).toFixed(2));
+            setVal('VarianceValue', (variance * map).toFixed(2));
+        }
+
+        function setupSCItemEvents(block) {
+            setupLookup(block, 'MapPerPiece', () => calcSegmentCount(block));
+            block.querySelectorAll('input').forEach(inp => {
+                if (inp.classList.contains('sc-calc-trigger')) {
+                    inp.addEventListener('input', () => calcSegmentCount(block));
+                }
+            });
+        }
+
+        const scContainer = document.getElementById('segmentItemsContainer');
+        const scNoOfItems = document.getElementById('scNoOfItems');
+
+        if (scContainer && scNoOfItems) {
+            const firstSCBlock = scContainer.querySelector('.segment-item-block');
+            const scItemTemplate = firstSCBlock ? firstSCBlock.cloneNode(true) : null;
+            if (firstSCBlock) setupSCItemEvents(firstSCBlock);
+
+            scNoOfItems.addEventListener('input', () => {
+                let count = parseInt(scNoOfItems.value) || 1;
+                if (count < 1) count = 1;
+                if (count > 20) count = 20;
+
+                const currentBlocks = scContainer.querySelectorAll('.segment-item-block');
+                const diff = count - currentBlocks.length;
+
+                if (diff > 0) {
+                    for (let i = 0; i < diff; i++) {
+                        const newBlock = scItemTemplate.cloneNode(true);
+                        const idx = currentBlocks.length + i + 1;
+                        const title = newBlock.querySelector('.sc-item-block-title');
+                        if (title) title.textContent = `Item ${idx} Details`;
+                        // Clear inputs
+                        newBlock.querySelectorAll('input:not([type="button"])').forEach(inp => inp.value = '');
+                        newBlock.querySelectorAll('select').forEach(sel => sel.value = '');
+                        setupSCItemEvents(newBlock);
+                        scContainer.appendChild(newBlock);
+                    }
+                } else if (diff < 0) {
+                    for (let i = 0; i < Math.abs(diff); i++) {
+                        if (scContainer.lastElementChild) scContainer.removeChild(scContainer.lastElementChild);
+                    }
+                }
+                if (typeof initCameraScanner === 'function') initCameraScanner();
+            });
+        }
+
+        segmentCountForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgEl = document.getElementById('segmentCountMessage');
+            const btn = document.getElementById('submitSegmentCountBtn');
+            const btnTxt = btn?.querySelector('.btn-text');
+            const loader = btn?.querySelector('.loader');
+
+            setLoading(true, btn, btnTxt, loader);
+            if (msgEl) msgEl.classList.add('hidden');
+
+            const blocks = scContainer.querySelectorAll('.segment-item-block');
+            const commonData = {};
+            const sharedInputs = segmentCountForm.querySelectorAll('input:not(.segment-item-block input), select:not(.segment-item-block select)');
+            sharedInputs.forEach(inp => { if(inp.name) commonData[inp.name] = inp.value; });
+
+            const user = JSON.parse(localStorage.getItem('storeUser'));
+            commonData['Timestamp'] = new Date().toLocaleString();
+            commonData['SubmittedBy'] = user ? user.empCode : "User";
+            commonData['action'] = 'saveSegmentCount';
+
+            const itemsToSubmit = [];
+            for (let b = 0; b < blocks.length; b++) {
+                const block = blocks[b];
+                const itemData = { ...commonData };
+                block.querySelectorAll('input, select').forEach(inp => { if (inp.name) itemData[inp.name] = inp.value; });
+                itemsToSubmit.push(itemData);
+            }
+
+            try {
+                let anyError = false;
+                let errorMsg = '';
+                for (const itemData of itemsToSubmit) {
+                    const params = new URLSearchParams();
+                    Object.keys(itemData).forEach(k => params.append(k, itemData[k]));
+                    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
+                    const json = await res.json();
+                    if (json.status !== 'success') {
+                        anyError = true;
+                        errorMsg = json.message;
+                    }
+                }
+                
+                if (anyError) showMessage(msgEl, "Error saving: " + errorMsg, "error");
+                else {
+                    showMessage(msgEl, "Saved successfully!", "success");
+                    segmentCountForm.reset();
+                    scNoOfItems.value = "1";
+                    scNoOfItems.dispatchEvent(new Event('input'));
+                }
+            } catch (err) {
+                console.error(err);
+                showMessage(msgEl, "Connection failed", "error");
+            } finally {
+                setLoading(false, btn, btnTxt, loader);
+            }
+        });
+    }
+
+    // --- Short Pick Articles Tab ---
+    const shortPickForm = document.getElementById('shortPickForm');
+    if (shortPickForm) {
+        function calcSPBlock(block) {
+            const ordered = parseFloat(block.querySelector('[name="OrderedQty"]')?.value) || 0;
+            const picked = parseFloat(block.querySelector('[name="PickedQty"]')?.value) || 0;
+            const map = parseFloat(block.querySelector('[name="MapPerPiece"]')?.value) || 0;
+
+            const shortQty = Math.max(0, ordered - picked);
+            const shortValue = shortQty * map;
+
+            const sqEl = block.querySelector('[name="ShortQty"]');
+            const svEl = block.querySelector('[name="ShortValue"]');
+            if (sqEl) sqEl.value = shortQty;
+            if (svEl) svEl.value = shortValue.toFixed(2);
+        }
+
+        function setupSPItemEvents(block) {
+            setupLookup(block, 'MapPerPiece', () => calcSPBlock(block));
+            block.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => calcSPBlock(block)));
+        }
+
+        const spContainer = document.getElementById('shortPickItemsContainer');
+        if (spContainer) {
+            const firstSPBlock = spContainer.querySelector('.sp-item-block');
+            const spItemTemplate = firstSPBlock ? firstSPBlock.cloneNode(true) : null;
+            if (firstSPBlock) setupSPItemEvents(firstSPBlock);
+
+            const spNoOfItems = document.getElementById('spNoOfItems');
+            if (spNoOfItems && spItemTemplate) {
+                spNoOfItems.addEventListener('input', () => {
+                    let count = parseInt(spNoOfItems.value) || 1;
+                    if (count < 1) count = 1;
+                    if (count > 20) count = 20;
+
+                    const currentBlocks = spContainer.querySelectorAll('.sp-item-block');
+                    const diff = count - currentBlocks.length;
+
+                    if (diff > 0) {
+                        for (let i = 0; i < diff; i++) {
+                            const newBlock = spItemTemplate.cloneNode(true);
+                            const idx = currentBlocks.length + i + 1;
+                            const title = newBlock.querySelector('.sp-item-block-title');
+                            if (title) title.textContent = `Item ${idx} Details`;
+                            newBlock.querySelectorAll('input:not([type="button"])').forEach(inp => inp.value = '');
+                            newBlock.querySelectorAll('select').forEach(sel => sel.value = '');
+                            setupSPItemEvents(newBlock);
+                            spContainer.appendChild(newBlock);
+                        }
+                    } else if (diff < 0) {
+                        for (let i = 0; i < Math.abs(diff); i++) {
+                            spContainer.removeChild(spContainer.lastElementChild);
+                        }
+                    }
+                    if (typeof initCameraScanner === 'function') initCameraScanner();
+                });
+            }
+        }
+
+        shortPickForm.addEventListener('submit', (e) =>
+            handleGenericSubmit(e, shortPickForm, 'saveShortPick', 'shortPickMessage', 'submitShortPickBtn')
+        );
+    }
+
 });
