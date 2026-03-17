@@ -1862,12 +1862,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if (typeof initCameraScanner === 'function') initCameraScanner();
                 });
+
+                // Initialize with default value (Top 5)
+                if (spNoOfItems.value > 1) {
+                    spNoOfItems.dispatchEvent(new Event('input'));
+                }
             }
         }
 
-        shortPickForm.addEventListener('submit', (e) =>
-            handleGenericSubmit(e, shortPickForm, 'saveShortPick', 'shortPickMessage', 'submitShortPickBtn')
-        );
+        shortPickForm.addEventListener('submit', async (e) => {
+            await handleGenericSubmit(e, shortPickForm, 'saveShortPick', 'shortPickMessage', 'submitShortPickBtn');
+            const spNoOfItemInput = document.getElementById('spNoOfItems');
+            if (spNoOfItemInput) {
+                spNoOfItemInput.value = "5";
+                spNoOfItemInput.dispatchEvent(new Event('input'));
+            }
+        });
     }
 
 });
