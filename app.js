@@ -1687,7 +1687,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const map = parseFloat(block.querySelector('[name="MapPerPiece"]')?.value) || 0;
 
             const variance = physical - system;
-            const variancePct = system !== 0 ? ((variance / system) * 100) : 0;
 
             const setVal = (name, val) => {
                 const el = block.querySelector(`[name="${name}"]`);
@@ -1695,9 +1694,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             setVal('Variance', variance);
-            setVal('VariancePct', variancePct.toFixed(2));
-            setVal('SystemValue', (system * map).toFixed(2));
-            setVal('PhysicalValue', (physical * map).toFixed(2));
             setVal('VarianceValue', (variance * map).toFixed(2));
         }
 
