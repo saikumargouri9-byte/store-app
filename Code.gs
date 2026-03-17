@@ -167,37 +167,49 @@ function doGet(e) {
     if (lastCol === 0) return createResponse({ status: 'error', message: 'Sheet "' + sheetName + '" has no headers. Run initialSetup from editor.' });
 
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    const rowData = headers.map(h => {
-      const key = String(h).replace(/\s+/g, '');
-      const keyLower = key.toLowerCase();
-      
-      // Auto-fallback for Sending Site
-      if (key === 'SendingSiteCode' || key === 'SendingSite') {
-          return e.parameter['SendingSite'] || e.parameter['SendingSiteCode'] || e.parameter[h] || '';
-      }
+    const noOfItems = parseInt(e.parameter['NoOfItems'] || "1");
+    const allParams = e.parameters;
 
-      // Auto-fallback for Floor Walk "Category" variations (e.g. users might name column "Category" instead of "Discrepancy Category")
-      if (keyLower === 'category' || keyLower === 'discrepancy' || keyLower === 'discrepancycategory') {
-          return e.parameter['DiscrepancyCategory'] || e.parameter[key] || e.parameter[h] || '';
-      }
+    for (let i = 0; i < noOfItems; i++) {
+        const rowData = headers.map(h => {
+            const key = String(h).replace(/\s+/g, '');
+            const keyLower = key.toLowerCase();
+            
+            // Get value from arrays (for repeated items) or single parameter (for header fields)
+            const getVal = (paramKey) => {
+                const arr = allParams[paramKey];
+                if (arr && arr.length > i) return arr[i];
+                return e.parameter[paramKey] || '';
+            };
 
-      // Auto-fallback for "Quantity" variations (e.g. users might name column "Qty")
-      // Careful: We don't want to accidentally map 'TotalQty' here, so only strict matches
-      if (keyLower === 'qty' || keyLower === 'quantity' || keyLower === 'quantities') {
-          return e.parameter['Quantity'] || e.parameter[key] || e.parameter[h] || '';
-      }
+            // Auto-fallback for Sending Site
+            if (key === 'SendingSiteCode' || key === 'SendingSite') {
+                return getVal('SendingSite') || getVal('SendingSiteCode') || getVal(h);
+            }
 
-      // Auto-fallback for "Involved EMP" / Employee / Incident variations
-      if (keyLower.includes('empname') || keyLower.includes('empid') || keyLower.includes('employeename') || keyLower.includes('employeecode')) {
-          if (keyLower.includes('name')) return e.parameter['EmpName'] || e.parameter['InvolvedEmpName'] || e.parameter[key] || e.parameter[h] || '';
-          if (keyLower.includes('id') || keyLower.includes('code')) return e.parameter['EmpID'] || e.parameter['InvolvedEmpCode'] || e.parameter[key] || e.parameter[h] || '';
-      }
+            // Auto-fallback for Floor Walk "Category" variations
+            if (keyLower === 'category' || keyLower === 'discrepancy' || keyLower === 'discrepancycategory') {
+                return getVal('DiscrepancyCategory') || getVal(key) || getVal(h);
+            }
 
-      return e.parameter[key] || e.parameter[h] || '';
-    });
+            // Auto-fallback for "Quantity" variations
+            if (keyLower === 'qty' || keyLower === 'quantity' || keyLower === 'quantities') {
+                return getVal('Quantity') || getVal(key) || getVal(h);
+            }
 
-    sheet.appendRow(rowData);
-    return createResponse({ status: 'success', message: 'Saved to ' + sheetName });
+            // Auto-fallback for "Involved EMP" / Employee / Incident variations
+            if (keyLower.includes('empname') || keyLower.includes('empid') || keyLower.includes('employeename') || keyLower.includes('employeecode')) {
+                if (keyLower.includes('name')) return getVal('EmpName') || getVal('InvolvedEmpName') || getVal(key) || getVal(h);
+                if (keyLower.includes('id') || keyLower.includes('code')) return getVal('EmpID') || getVal('InvolvedEmpCode') || getVal(key) || getVal(h);
+            }
+
+            return getVal(key) || getVal(h);
+        });
+
+        sheet.appendRow(rowData);
+    }
+    
+    return createResponse({ status: 'success', message: 'Saved ' + noOfItems + ' records to ' + sheetName });
   }
 
   return createResponse({ status: 'error', message: 'Action "' + action + '" not recognized.' });
