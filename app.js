@@ -1765,60 +1765,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         segmentCountForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msgEl = document.getElementById('segmentCountMessage');
-            const btn = document.getElementById('submitSegmentCountBtn');
-            const btnTxt = btn?.querySelector('.btn-text');
-            const loader = btn?.querySelector('.loader');
-
-            setLoading(true, btn, btnTxt, loader);
-            if (msgEl) msgEl.classList.add('hidden');
-
-            const blocks = scContainer.querySelectorAll('.segment-item-block');
-            const commonData = {};
-            const sharedInputs = segmentCountForm.querySelectorAll('input:not(.segment-item-block input), select:not(.segment-item-block select)');
-            sharedInputs.forEach(inp => { if(inp.name) commonData[inp.name] = inp.value; });
-
-            const user = JSON.parse(localStorage.getItem('storeUser'));
-            commonData['Timestamp'] = new Date().toLocaleString();
-            commonData['SubmittedBy'] = user ? user.empCode : "User";
-            commonData['action'] = 'saveSegmentCount';
-
-            const itemsToSubmit = [];
-            for (let b = 0; b < blocks.length; b++) {
-                const block = blocks[b];
-                const itemData = { ...commonData };
-                block.querySelectorAll('input, select').forEach(inp => { if (inp.name) itemData[inp.name] = inp.value; });
-                itemsToSubmit.push(itemData);
-            }
-
-            try {
-                let anyError = false;
-                let errorMsg = '';
-                for (const itemData of itemsToSubmit) {
-                    const params = new URLSearchParams();
-                    Object.keys(itemData).forEach(k => params.append(k, itemData[k]));
-                    const res = await fetch(`${SCRIPT_URL}?${params.toString()}`, { method: 'GET', mode: 'cors' });
-                    const json = await res.json();
-                    if (json.status !== 'success') {
-                        anyError = true;
-                        errorMsg = json.message;
-                    }
-                }
-                
-                if (anyError) showMessage(msgEl, "Error saving: " + errorMsg, "error");
-                else {
-                    showMessage(msgEl, "Saved successfully!", "success");
-                    segmentCountForm.reset();
-                    scNoOfItems.value = "5";
-                    scNoOfItems.dispatchEvent(new Event('input'));
-                }
-            } catch (err) {
-                console.error(err);
-                showMessage(msgEl, "Connection failed", "error");
-            } finally {
-                setLoading(false, btn, btnTxt, loader);
-            }
+            await handleGenericSubmit(e, segmentCountForm, 'saveSegmentCount', 'segmentCountMessage', 'submitSegmentCountBtn');
+            // Reset to 5 items defaults
+            scNoOfItems.value = "5";
+            scNoOfItems.dispatchEvent(new Event('input'));
         });
     }
 
