@@ -149,7 +149,9 @@ function doGet(e) {
     'saveRegisterValidation': 'RegisterValidation',
     'saveQcJio':              'QcJioExceptions',
     'saveFashion':            'FashionExceptions',
-    'saveIncident':           'IncidentLogs'
+    'saveIncident':           'IncidentLogs',
+    'saveSegmentCount':       'SegmentCount',
+    'saveShortPick':          'ShortPick'
   };
 
   if (saveActions[action]) {
@@ -211,7 +213,9 @@ function createSheetWithHeaders(ss, sheetName) {
     'RegisterValidation':  ['Timestamp','SubmittedBy','StoreCode','Date','BusinessType','RegisterName','CheckingLpaName','NoOfException','ArticleCode','EanCode','ArticleDescription','MapPerPiece','RegisterQty','DocumentQuantity','ExceptionQty','ExceptionValue','OthersRemarks'],
     'QcJioExceptions':     ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OrderNo','PickerID','PickerName','ArticleCode','EanCode','ArticleDescription','InvoiceQty','PackQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','ExpireVal','TotalDiscrepantEaches','MapPerPiece','TotalValue','Remarks'],
     'FashionExceptions':   ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','Location','ArticleCode','EanCode','ArticleDescription','NoHardtagQty','NoHardtagVal','DamagedQty','DamageVal','GrazingQty','GrazingVal','MapPerPiece','TotalValue','Remarks'],
-    'IncidentLogs':        ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','ExceptionType','NoOfException','EmpName','EmpID','BilledNo','RposID','CustomerName','CustomerGender','LocationFound','EanCode','ArticleCode','ArticleDescription','Quantity','MapPerPiece','TotalValue']
+    'IncidentLogs':        ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','ExceptionType','NoOfException','EmpName','EmpID','BilledNo','RposID','CustomerName','CustomerGender','LocationFound','EanCode','ArticleCode','ArticleDescription','Quantity','MapPerPiece','TotalValue'],
+    'SegmentCount':        ['Timestamp','SubmittedBy','SiteCode','Date','LpaName','Segment','Category','OverallSystemQty','OverallPhysicalQty','OverallDifferenceQty','OverallShrinkValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','VarianceValue'],
+    'ShortPick':           ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OrderNo','PickerID','PickerName','NoOfItems','ArticleCode','EanCode','ArticleDescription','OrderedQty','PickedQty','ShortQty','MapPerPiece','ShortValue','Reason']
   };
 
   const headers = headersMap[sheetName];
@@ -224,7 +228,7 @@ function createSheetWithHeaders(ss, sheetName) {
 // Run this ONCE from the editor to build all sheets
 function initialSetup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetNames = ['VehicleData','ReceivingExceptions','FloorWalk','RegisterValidation','QcJioExceptions','FashionExceptions','IncidentLogs','Employees','JS Master'];
+  const sheetNames = ['VehicleData','ReceivingExceptions','FloorWalk','RegisterValidation','QcJioExceptions','FashionExceptions','IncidentLogs','Employees','JS Master','SegmentCount','ShortPick'];
   sheetNames.forEach(name => {
     if (!ss.getSheetByName(name)) createSheetWithHeaders(ss, name);
   });
