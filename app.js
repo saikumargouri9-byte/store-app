@@ -1,4 +1,4 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwl5onAKoGYhWBIzCNtJCq-eMiPCIcL4vJCQtO9xmFmgMfEzCX22uu6iNJ1zRMTUQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx14yj0cGpj86_-cm2aPEVjA-O_bSYXZbxqGqs9m5QHxNQZJsFpckZY4VTojlYGgb4/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("App Initializing...");
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
             item.addEventListener('click', () => {
                 const tabId = item.getAttribute('data-tab');
                 console.log("Switching to tab:", tabId);
-                
+
                 if (tabId === 'performanceDashboardTab') {
                     if (typeof fetchDashboardData === 'function') fetchDashboardData();
                 }
@@ -156,15 +156,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalEl = document.getElementById('dashTotalExceptions');
         const tbBody = document.getElementById('dashDateWiseTableBody');
         const refreshBtnTxt = document.getElementById('refreshDashText');
-        
+
         if (!totalEl || !tbBody) return;
 
         try {
             if (refreshBtnTxt) refreshBtnTxt.textContent = "Loading Analytics...";
-            
+
             const url = new URL(SCRIPT_URL);
             url.searchParams.append('action', 'getDashboardData');
-            
+
             // Pass the currently logged-in user's ID
             const saved = localStorage.getItem('storeUser');
             if (saved) {
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (user && user.empCode) {
                         url.searchParams.append('empCode', user.empCode);
                     }
-                } catch(e) {}
+                } catch (e) { }
             }
 
             url.searchParams.append('_', Date.now());
@@ -182,76 +182,94 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (result.status === 'success') {
-                totalEl.textContent = result.data.total;
+                const rawData = result.data.adminData || [];
                 
-                // Populate Table
-                tbBody.innerHTML = '';
-                const dWise = result.data.dateWise;
-                if (Object.keys(dWise).length === 0) {
-                    tbBody.innerHTML = '<tr><td colspan="2" style="padding: 20px; text-align: center; color: var(--grey-500);">No data found</td></tr>';
-                } else {
-                    for (const [date, count] of Object.entries(dWise)) {
-                        const tr = document.createElement('tr');
-                        tr.style.background = 'white';
-                        tr.style.cursor = 'default';
-                        tr.addEventListener('mouseenter', () => tr.style.background = 'var(--grey-50)');
-                        tr.addEventListener('mouseleave', () => tr.style.background = 'white');
-                        
-                        const tdDate = document.createElement('td');
-                        tdDate.style.padding = '12px';
-                        tdDate.style.borderBottom = '1px solid var(--grey-200)';
-                        tdDate.style.color = 'var(--text-dark)';
-                        tdDate.textContent = date;
-                        
-                        const tdCount = document.createElement('td');
-                        tdCount.style.padding = '12px';
-                        tdCount.style.borderBottom = '1px solid var(--grey-200)';
-                        tdCount.style.textAlign = 'center';
-                        tdCount.style.fontWeight = '600';
-                        tdCount.style.color = 'var(--blue-main)';
-                        tdCount.textContent = count;
-                        
-                        tr.appendChild(tdDate);
-                        tr.appendChild(tdCount);
-                        tbBody.appendChild(tr);
-                    }
+                // RESILIENT PROPERTY MAPPING (Handles all script versions)
+                const mappedData = rawData.map(item => ({
+                    date:     item.date || item.Date || 'Unknown',
+                    store:    item.store || item.Store || 'Unknown',
+                    lpa:      item.lpa || item.LPA || item.LpaName || 'Unknown',
+                    value:    parseFloat(item.value !== undefined ? item.value : (item.val !== undefined ? item.val : 0)) || 0,
+                    empCode:  String(item.empCode || item.user || item.EmpCode || '').trim(),
+                    module:   item.module || item.mod || 'Unknown'
+                }));
+
+                // 1. Filter out VehicleData for the standard totals
+                const exceptionRecords = mappedData.filter(i => i.module !== 'VehicleData');
+                const totalValue = exceptionRecords.reduce((sum, i) => sum + i.value, 0);
+
+                if (totalEl) totalEl.textContent = exceptionRecords.length;
+                if (document.getElementById('dashTotalValue')) {
+                    document.getElementById('dashTotalValue').textContent = '₹' + totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 });
                 }
+
+                // Aggregation Helper for Staff Tables
+                const aggregate = (arr, keyExtractor) => {
+                    const map = {};
+                    arr.forEach(item => {
+                        const ky = keyExtractor(item) || 'Unknown';
+                        if (!map[ky]) map[ky] = { count: 0, val: 0 };
+                        map[ky].count++;
+                        map[ky].val += (parseFloat(item.value) || 0);
+                    });
+                    return Object.entries(map).map(e => ({ name: e[0], count: e[1].count, val: e[1].val })).sort((a, b) => b.count - a.count);
+                };
 
                 // Populate Module Table
                 const modTbBody = document.getElementById('dashModuleWiseTableBody');
                 if (modTbBody) {
                     modTbBody.innerHTML = '';
-                    const mWise = result.data.moduleWise || {};
-                    if (Object.keys(mWise).length === 0) {
-                        modTbBody.innerHTML = '<tr><td colspan="2" style="padding: 20px; text-align: center; color: var(--grey-500);">No data found</td></tr>';
+                    const mWise = aggregate(exceptionRecords, i => i.module);
+                    if (mWise.length === 0) {
+                        modTbBody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--grey-500);">No data found</td></tr>';
                     } else {
-                        for (const [moduleName, count] of Object.entries(mWise)) {
+                        mWise.forEach(row => {
                             const tr = document.createElement('tr');
-                            tr.style.background = 'white';
-                            tr.style.cursor = 'default';
-                            tr.addEventListener('mouseenter', () => tr.style.background = 'var(--grey-50)');
-                            tr.addEventListener('mouseleave', () => tr.style.background = 'white');
-                            
-                            const tdName = document.createElement('td');
-                            tdName.style.padding = '12px';
-                            tdName.style.borderBottom = '1px solid var(--grey-200)';
-                            tdName.style.color = 'var(--text-dark)';
-                            tdName.textContent = moduleName;
-                            
-                            const tdCount = document.createElement('td');
-                            tdCount.style.padding = '12px';
-                            tdCount.style.borderBottom = '1px solid var(--grey-200)';
-                            tdCount.style.textAlign = 'center';
-                            tdCount.style.fontWeight = '600';
-                            tdCount.style.color = 'var(--blue-main)';
-                            tdCount.textContent = count;
-                            
-                            tr.appendChild(tdName);
-                            tr.appendChild(tdCount);
+                            tr.innerHTML = `
+                                <td style="padding: 12px; border-bottom: 1px solid var(--grey-200);">${row.name}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--grey-200); text-align:center;">${row.count}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid var(--grey-200); text-align:right; font-weight:600;">₹${row.val.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                            `;
                             modTbBody.appendChild(tr);
-                        }
+                        });
                     }
                 }
+
+                // Populate Date Table
+                tbBody.innerHTML = '';
+                const dWise = aggregate(exceptionRecords, i => i.date);
+                if (dWise.length === 0) {
+                    tbBody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--grey-500);">No data found</td></tr>';
+                } else {
+                    // Sort by date descending
+                    dWise.sort((a, b) => b.name.localeCompare(a.name)).forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="padding: 12px; border-bottom: 1px solid var(--grey-200);">${row.name}</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--grey-200); text-align:center;">${row.count}</td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--grey-200); text-align:right; font-weight:600;">₹${row.val.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                        `;
+                        tbBody.appendChild(tr);
+                    });
+                }
+
+                // Populate Vehicle Stats for Performance Tab (Resilient to tc/totalCount, tv/totalValue)
+                if (result.data.vehicleStats) {
+                    const vs = result.data.vehicleStats;
+                    const vCount = vs.totalCount !== undefined ? vs.totalCount : (vs.tc !== undefined ? vs.tc : 0);
+                    const vValue = vs.totalValue !== undefined ? vs.totalValue : (vs.tv !== undefined ? vs.tv : 0);
+                    
+                    const setVal = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val; };
+                    setVal('perfVehiclesCount', vCount);
+                    setVal('perfVehiclesValue', '₹' + vValue.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+                    
+                    const types = vs.types || vs.ts || {};
+                    setVal('perfVehTypeCPC', types['CPC'] || 0);
+                    setVal('perfVehTypeDC', types['DC'] || 0);
+                    setVal('perfVehTypeDSD', types['DSD'] || 0);
+                    setVal('perfVehTypeIST', types['IST'] || 0);
+                }
+
             } else {
                 totalEl.textContent = "Error";
                 tbBody.innerHTML = `<tr><td colspan="2" style="padding: 20px; text-align: center; color: #d32f2f;">Error loading data: ${result.message}</td></tr>`;
@@ -286,9 +304,54 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(url.toString());
             const json = await res.json();
 
-            if (json.status === 'success' && json.data.adminData) {
-                fullAdminExceptionData = json.data.adminData;
-                applyAdminFilters(); // Renders the dashboard
+            if (json.status === 'success' && json.data) {
+                console.log("Admin Data Received:", json.data.adminData?.length || 0, "records found.");
+
+                // 1. Populate Admin Vehicle Stats (Handles tc/tv/ts abbreviations)
+                if (json.data.vehicleStats) {
+                    const vs = json.data.vehicleStats;
+                    const vCount = vs.totalCount !== undefined ? vs.totalCount : (vs.tc !== undefined ? vs.tc : 0);
+                    const vValue = vs.totalValue !== undefined ? vs.totalValue : (vs.tv !== undefined ? vs.tv : 0);
+                    const vTypes = vs.types || vs.ts || {};
+
+                    const setTxt = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val; };
+                    setTxt('adVehiclesCount', vCount);
+                    setTxt('adVehiclesValue', '₹' + vValue.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+                    setTxt('adVehTypeCPC', vTypes['CPC'] || 0);
+                    setTxt('adVehTypeDC', vTypes['DC'] || 0);
+                    setTxt('adVehTypeDSD', vTypes['DSD'] || 0);
+                    setTxt('adVehTypeIST', vTypes['IST'] || 0);
+                }
+
+                // Ensure robust object keys for both local and server compatibility
+                if (json.data.adminData) {
+                    const rawData = json.data.adminData;
+                    // RESILIENT PROPERTY MAPPING (Handles all script versions)
+                    const mappedData = rawData.map(item => {
+                        return {
+                            date:     item.date || item.Date || 'Unknown',
+                            store:    item.store || item.Store || 'Unknown',
+                            lpa:      item.lpa || item.LPA || item.LpaName || 'Unknown',
+                            // Look for 'value' or 'val'
+                            value:    parseFloat(item.value !== undefined ? item.value : (item.val !== undefined ? item.val : 0)) || 0,
+                            // Look for 'empCode' or 'user'
+                            empCode:  String(item.empCode || item.user || item.EmpCode || '').trim(),
+                            // Look for 'module' or 'mod'
+                            module:   item.module || item.mod || 'Unknown',
+                            // Look for 'category' or 'cat'
+                            category: item.category || item.cat || item.module || item.mod || 'Unknown'
+                        };
+                    });
+
+                    // Filter for Staff users (Staff only see their own performance)
+                    const currentUser = JSON.parse(sessionStorage.getItem('storeAppUser') || '{}');
+                    const isStaff = currentUser.role === 'Staff';
+                    fullAdminExceptionData = isStaff ? 
+                        mappedData.filter(d => d.empCode.toLowerCase() === currentUser.empCode.toLowerCase()) : 
+                        mappedData;
+                }
+
+                applyAdminFilters(); // Renders the exceptions dashboard
             } else {
                 console.error("Admin fetch failed:", json.message);
             }
@@ -309,15 +372,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('adminCustomDateBox')?.classList.toggle('hidden', dateFilter !== 'custom');
 
         const today = new Date();
-        today.setHours(0,0,0,0);
+        today.setHours(0, 0, 0, 0);
 
         if (dateFilter !== 'all' && dateFilter !== 'custom') {
             filteredData = fullAdminExceptionData.filter(item => {
                 if (!item.date || item.date === 'Unknown Date') return false;
                 const d = new Date(item.date);
                 if (isNaN(d.getTime())) return false;
-                d.setHours(0,0,0,0);
-                
+                d.setHours(0, 0, 0, 0);
+
                 const diffTime = today - d;
                 const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
@@ -332,8 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const dTo = new Date(document.getElementById('adminDateTo')?.value || 0);
             if (!isNaN(dFrom) && !isNaN(dTo)) {
                 filteredData = fullAdminExceptionData.filter(item => {
-                   const d = new Date(item.date);
-                   return d >= dFrom && d <= dTo;
+                    const d = new Date(item.date);
+                    return d >= dFrom && d <= dTo;
                 });
             }
         }
@@ -342,27 +405,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAdminDashboard(data) {
-        // Summary
-        const uniqueStores = new Set(data.map(i => i.store)).size;
-        const uniqueLPAs = new Set(data.map(i => i.lpa)).size;
-        const totalValue = data.reduce((sum, i) => sum + i.value, 0);
+        // Separate Exceptions from Vehicle Inwards
+        const exceptionRecords = data.filter(i => i.module !== 'VehicleData' && i.module !== 'VehInwards');
+        const vehicleRecords = data.filter(i => i.module === 'VehicleData' || i.module === 'VehInwards');
+
+        // 1. Update Exception Summary Stats
+        const uniqueStores = new Set(exceptionRecords.map(i => i.store)).size;
+        const uniqueLPAs = new Set(exceptionRecords.map(i => i.lpa)).size;
+        const totalValue = exceptionRecords.reduce((sum, i) => sum + (parseFloat(i.value) || 0), 0);
 
         const setTxt = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val; };
         setTxt('adTotalStores', uniqueStores);
         setTxt('adTotalLPAs', uniqueLPAs);
-        setTxt('adTotalCount', data.length);
+        setTxt('adTotalCount', exceptionRecords.length);
         setTxt('adTotalValue', totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
-        // Aggregation Helpers
+        // 2. Update Inward Vehicle Overview (Dynamic filtering fix)
+        const totalVehValue = vehicleRecords.reduce((sum, i) => sum + (parseFloat(i.value) || 0), 0);
+        setTxt('adVehiclesCount', vehicleRecords.length);
+        setTxt('adVehiclesValue', '₹' + totalVehValue.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+
+        // Vehicle Type Aggregation (CPC, DC, etc.)
+        const vTypes = { 'CPC': 0, 'DC': 0, 'DSD': 0, 'IST': 0 };
+        vehicleRecords.forEach(v => {
+            const type = (v.category || '').toUpperCase();
+            if (vTypes.hasOwnProperty(type)) vTypes[type]++;
+        });
+        setTxt('adVehTypeCPC', vTypes['CPC']);
+        setTxt('adVehTypeDC', vTypes['DC']);
+        setTxt('adVehTypeDSD', vTypes['DSD']);
+        setTxt('adVehTypeIST', vTypes['IST']);
+
+        // 3. Aggregation Helpers for Tables (Exceptions only)
         const aggregate = (keyExtractor) => {
             const map = {};
-            data.forEach(item => {
-                const ky = keyExtractor(item);
+            exceptionRecords.forEach(item => {
+                const ky = keyExtractor(item) || 'Unknown';
                 if (!map[ky]) map[ky] = { count: 0, val: 0 };
                 map[ky].count++;
-                map[ky].val += item.value;
+                map[ky].val += (parseFloat(item.value) || 0);
             });
-            return Object.entries(map).map(e => ({ name: e[0], count: e[1].count, val: e[1].val })).sort((a,b) => b.count - a.count);
+            return Object.entries(map).map(e => ({ name: e[0], count: e[1].count, val: e[1].val })).sort((a, b) => b.count - a.count);
         };
 
         const generateTableRows = (arr, tbodyId, type) => {
@@ -408,9 +491,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterType === 'lpa') items = data.filter(i => `${i.lpa} (${i.empCode || 'Unknown'})` === filterName);
 
         mTitle.textContent = `Exception Details: ${filterName} (${items.length} records)`;
-        
+
         mBody.innerHTML = '';
-        items.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
+        items.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(item => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding: 10px; border-bottom: 1px solid var(--grey-200);">${item.date}</td>
@@ -434,13 +517,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btnAdminExportCSV')?.addEventListener('click', () => {
         if (!fullAdminExceptionData || fullAdminExceptionData.length === 0) return alert('No data to export.');
-        
+
         const headers = ["Date", "Store", "LPA", "EmpCode", "Category", "Value"];
         const csvContent = [headers.join(',')];
-        
+
         fullAdminExceptionData.forEach(item => {
             const row = [
-                `"${item.date}"`, `"${item.store}"`, `"${item.lpa}"`, 
+                `"${item.date}"`, `"${item.store}"`, `"${item.lpa}"`,
                 `"${item.empCode}"`, `"${item.category}"`, `${item.value}`
             ];
             csvContent.push(row.join(','));
@@ -450,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `Admin_Exceptions_${new Date().toISOString().slice(0,10)}.csv`);
+        link.setAttribute("download", `Admin_Exceptions_${new Date().toISOString().slice(0, 10)}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -563,12 +646,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const itemsContainer = document.getElementById('recvItemsContainer');
         const noOfExceptionInput = document.getElementById('excNoOfException');
-        
+
         let initialItemTemplate = null;
         if (itemsContainer) {
-             const firstItem = itemsContainer.querySelector('.recv-item-block');
-             initialItemTemplate = firstItem.cloneNode(true);
-             setupRecvItemEvents(firstItem);
+            const firstItem = itemsContainer.querySelector('.recv-item-block');
+            initialItemTemplate = firstItem.cloneNode(true);
+            setupRecvItemEvents(firstItem);
         }
 
         if (noOfExceptionInput && itemsContainer) {
@@ -576,10 +659,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 let count = parseInt(noOfExceptionInput.value) || 1;
                 if (count < 1) count = 1;
                 if (count > 20) count = 20;
-                
+
                 const currentBlocks = itemsContainer.querySelectorAll('.recv-item-block');
                 const diff = count - currentBlocks.length;
-                
+
                 if (diff > 0) {
                     for (let i = 0; i < diff; i++) {
                         const newBlock = initialItemTemplate.cloneNode(true);
@@ -600,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         itemsContainer.removeChild(itemsContainer.lastElementChild);
                     }
                 }
-                
+
                 if (typeof initCameraScanner === 'function') initCameraScanner();
             });
         }
@@ -729,16 +812,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const excQtyEl = block.querySelector('[name="ExceptionQty"]');
             const excValEl = block.querySelector('[name="ExceptionValue"]');
-            const remarksEl = block.querySelector('[name="OthersRemarks"]'); 
+            const remarksEl = block.querySelector('[name="OthersRemarks"]');
 
             if (excQtyEl) excQtyEl.value = excQty;
             if (excValEl) excValEl.value = excVal.toFixed(2);
-            
+
             // Auto Remarks based on Exception Quantity Difference
             if (remarksEl) {
                 const currentRemark = remarksEl.value;
                 const isAuto = !currentRemark || currentRemark.includes("Posting") || currentRemark === "Matched" || currentRemark === "Register Update Missing";
-                
+
                 if (isAuto) {
                     if (excQty !== 0) {
                         if (registersWithItems.includes(selectedReg)) {
@@ -762,12 +845,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const rvItemsContainer = document.getElementById('regValItemsContainer');
         const rvNoOfExceptionInput = document.getElementById('rvNoOfException');
-        
+
         let rvInitialItemTemplate = null;
         if (rvItemsContainer) {
-             const firstItem = rvItemsContainer.querySelector('.reg-val-item-block');
-             rvInitialItemTemplate = firstItem.cloneNode(true);
-             setupRVItemEvents(firstItem);
+            const firstItem = rvItemsContainer.querySelector('.reg-val-item-block');
+            rvInitialItemTemplate = firstItem.cloneNode(true);
+            setupRVItemEvents(firstItem);
         }
 
         if (rvNoOfExceptionInput && rvItemsContainer) {
@@ -775,10 +858,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 let count = parseInt(rvNoOfExceptionInput.value) || 1;
                 if (count < 1) count = 1;
                 if (count > 20) count = 20;
-                
+
                 const currentBlocks = rvItemsContainer.querySelectorAll('.reg-val-item-block');
                 const diff = count - currentBlocks.length;
-                
+
                 if (diff > 0) {
                     for (let i = 0; i < diff; i++) {
                         const newBlock = rvInitialItemTemplate.cloneNode(true);
@@ -797,25 +880,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         rvItemsContainer.removeChild(rvItemsContainer.lastElementChild);
                     }
                 }
-                
+
                 // Re-sync item identification visibility for new blocks
                 if (rvRegisterName) rvRegisterName.dispatchEvent(new Event('change'));
                 if (typeof initCameraScanner === 'function') initCameraScanner();
             });
         }
-        
+
         // Dynamically show/hide "Item Identification" depending on selected register type
         if (rvRegisterName) {
             rvRegisterName.addEventListener('change', () => {
                 const selectedReg = rvRegisterName.value;
                 const blocks = rvItemsContainer.querySelectorAll('.reg-val-item-block');
-                
+
                 blocks.forEach(block => {
                     const itemSection = block.querySelector('.rv-item-id-section');
                     const regQtyInput = block.querySelector('[name="RegisterQty"]');
                     const docQtyInput = block.querySelector('[name="DocumentQuantity"]');
                     const isMatch = registersWithItems.includes(selectedReg);
-                    
+
                     console.log(`Register Validation: ${selectedReg} matched for item details? ${isMatch}`);
 
                     if (isMatch) {
@@ -826,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (itemSection) itemSection.style.display = 'none';
                         if (regQtyInput) regQtyInput.setAttribute('step', '1');
                         if (docQtyInput) docQtyInput.setAttribute('step', '1');
-                        
+
                         // Clear the hidden item fields
                         const inputsToClear = ['ArticleCode', 'EanCode', 'ArticleDescription', 'MapPerPiece'];
                         inputsToClear.forEach(name => {
@@ -838,11 +921,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         }
-        
+
         regValForm.addEventListener('submit', async (e) => {
             await handleGenericSubmit(e, regValForm, 'saveRegisterValidation', 'regValMessage', 'submitRegValBtn');
             rvNoOfExceptionInput.value = "1";
-            rvNoOfExceptionInput.dispatchEvent(new Event('input')); 
+            rvNoOfExceptionInput.dispatchEvent(new Event('input'));
             if (rvBusinessType) rvBusinessType.dispatchEvent(new Event('change'));
         });
     }
@@ -894,12 +977,12 @@ document.addEventListener('DOMContentLoaded', () => {
         function setupQJItemEvents(block) {
             setupLookup(block, 'MapPerPiece', () => calcQJBlock(block));
             block.querySelectorAll('[name="InvoiceQty"],[name="PackQty"],.qj-calc-trigger')
-                 .forEach(i => i.addEventListener('input', () => calcQJBlock(block)));
+                .forEach(i => i.addEventListener('input', () => calcQJBlock(block)));
         }
 
         const qjItemsContainer = document.getElementById('qcJioItemsContainer');
         const qjNoOfExceptionInput = document.getElementById('qcNoOfException');
-        
+
         let qjItemTemplate = null;
         if (qjItemsContainer) {
             const firstBlock = qjItemsContainer.querySelector('.qc-jio-item-block');
@@ -924,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const index = currentBlocks.length + i + 1;
                         const title = newBlock.querySelector('.qc-item-block-title');
                         if (title) title.textContent = `Item ${index} Identification`;
-                        
+
                         newBlock.querySelectorAll('input:not([type="button"])').forEach(input => input.value = '');
                         setupQJItemEvents(newBlock);
                         qjItemsContainer.appendChild(newBlock);
@@ -953,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         if (qjItemsContainer) qjItemsContainer.style.display = 'block';
                         if (qcRemarks && qcRemarks.value === 'Virtual CN generated') {
-                            qcRemarks.value = ''; 
+                            qcRemarks.value = '';
                         }
                     }
                 });
@@ -1031,7 +1114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const utItemsContainer = document.getElementById('utItemsContainer');
         const utNoOfExceptionInput = document.getElementById('utNoOfException');
-        
+
         let utItemTemplate = null;
         if (utItemsContainer) {
             const firstBlock = utItemsContainer.querySelector('.ut-item-block');
@@ -1055,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const index = currentBlocks.length + i + 1;
                         const title = newBlock.querySelector('.ut-item-block-title');
                         if (title) title.textContent = `Item ${index} Details`;
-                        
+
                         newBlock.querySelectorAll('input:not([type="button"])').forEach(input => input.value = '');
                         newBlock.querySelectorAll('select').forEach(sel => sel.selectedIndex = 0);
                         setupUTBlockEvents(newBlock);
@@ -1109,7 +1192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const missing = [];
         for (let [key, val] of formData.entries()) {
             if (['ArticleCode', 'EnaCode', 'EanCode'].includes(key)) continue;
-            
+
             // For Unbilled tab, ignore fields that are currently hidden
             if (form.id === 'unbilledForm') {
                 const type = data.ExceptionType;
@@ -1130,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         let skipArticleCheck = form.id === 'dataForm';
-        
+
         // Skip Article Code validation for non-item registers in Register Validation
         if (form.id === 'regValForm') {
             const registersWithItems = ['Dump Register', 'DAD Register', 'Loose Conversion Register', 'Markdown Register', 'F&V PI Register'];
@@ -1210,13 +1293,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 form.reset();
-                
+
                 // Re-populate LPA Name & Store Code after reset
                 const lpaInput = form.querySelector('input[name="LPA"], input[name="LpaName"], input[name="CheckingLpaName"]');
                 if (lpaInput && user && (user.name || user.empCode)) {
                     lpaInput.value = user.name || user.empCode;
                 }
-                
+
                 // NOTE: We deliberately do NOT call resetFormDates() here.
                 // Date fields left blank after reset so the USER must choose
                 // the correct date for each new entry — past or present.
@@ -1251,14 +1334,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDashboard(user) {
         if (loginContainer) loginContainer.classList.add('hidden');
         if (dashboard) dashboard.classList.remove('hidden');
-        
+
         if (welcomeText) welcomeText.textContent = user.name || user.empCode || 'User';
         if (userRole) userRole.textContent = user.role || 'Staff';
 
         // Role-based Layout Switcher
         const normTab = document.getElementById('navNormalDashboard');
         const adminTab = document.getElementById('navAdminDashboard');
-        
+
         const role = String(user.role || '').trim().toLowerCase();
 
         if (role === 'admin') {
@@ -1305,15 +1388,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const overlay = document.createElement('div');
                 overlay.id = 'scanOverlay';
                 overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                
+
                 const scannerContainer = document.createElement('div');
                 scannerContainer.id = 'scanner-view';
                 scannerContainer.style.cssText = 'width:100%; max-width:400px; aspect-ratio:1/1; border-radius:12px; border: 2px solid #3b82f6; background: #111; overflow: hidden;';
-                
+
                 const hint = document.createElement('p');
                 hint.textContent = '📷 Initializing camera...';
                 hint.style.cssText = 'color:white;margin-top:20px;font-size:14px;text-align:center;font-family: sans-serif;';
-                
+
                 const legacyBtn = document.createElement('button');
                 legacyBtn.textContent = '📸 Camera not opening? Use Photo Mode';
                 legacyBtn.style.cssText = 'margin-top:15px;padding:12px 20px;background:rgba(255,255,255,0.1);color:white;border:1px solid #555;border-radius:10px;font-size:14px;cursor:pointer;';
@@ -1329,9 +1412,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.appendChild(overlay);
 
                 const html5QrCode = new Html5Qrcode("scanner-view");
-                
+
                 const stopScanner = async () => {
-                    try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch(e){}
+                    try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch (e) { }
                     overlay.remove();
                 };
 
@@ -1358,7 +1441,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         try {
                             const result = await html5QrCode.scanFile(fileInput.files[0], true);
                             onScanSuccess(result);
-                        } catch(err) {
+                        } catch (err) {
                             alert("No barcode found in photo. Please ensure it's clear and try again.");
                             hint.textContent = '❌ No barcode found.';
                         }
@@ -1368,8 +1451,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     await html5QrCode.start(
-                        { facingMode: "environment" }, 
-                        { fps: 15, qrbox: { width: 250, height: 150 } }, 
+                        { facingMode: "environment" },
+                        { fps: 15, qrbox: { width: 250, height: 150 } },
                         onScanSuccess
                     );
                     hint.textContent = '✅ Live Camera Active. Center barcode in square.';
@@ -1558,6 +1641,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 spNoOfItemInput.dispatchEvent(new Event('input'));
             }
         });
-    }
+    }    // --- Auto Fetch Employee Name ---
+    document.addEventListener('blur', async (e) => {
+        if (e.target && e.target.classList.contains('global-emp-id')) {
+            const empId = e.target.value.trim();
+            if (!empId) return;
+
+            const form = e.target.closest('form');
+            if (!form) return;
+            const nameInput = form.querySelector('.global-emp-name');
+            if (!nameInput) return;
+
+            try {
+                const oldPlaceholder = nameInput.placeholder;
+                nameInput.placeholder = "Fetching name...";
+                
+                const url = new URL(SCRIPT_URL);
+                url.searchParams.append('action', 'getEmployeeData');
+                url.searchParams.append('empId', empId);
+                
+                const response = await fetch(url.toString());
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.name) {
+                    nameInput.value = result.name;
+                } else {
+                    nameInput.placeholder = "Not found, enter manually";
+                }
+            } catch (error) {
+                console.error("Error fetching employee data:", error);
+                nameInput.placeholder = "Auto-filled or Enter";
+            }
+        }
+    }, true);
 
 });

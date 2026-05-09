@@ -20,6 +20,19 @@ function doGet(e) {
     return createResponse({ status: 'error', message: 'Invalid credentials' });
   }
 
+  if (action === 'getEmployeeData') {
+    const empSheet = ss.getSheetByName('Employee data');
+    if (!empSheet) return createResponse({ status: 'error', message: 'Employee data sheet not found' });
+    const data = empSheet.getDataRange().getValues();
+    const empId = String(e.parameter.empId || '').trim();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === empId) {
+        return createResponse({ status: 'success', name: data[i][1] });
+      }
+    }
+    return createResponse({ status: 'error', message: 'Employee not found' });
+  }
+
   if (action === 'getMasterData') {
     const masterSheet = ss.getSheetByName('JS Master');
     if (!masterSheet) return createResponse({ status: 'error', message: 'JS Master sheet not found' });
@@ -39,18 +52,24 @@ function doGet(e) {
     const isAdmin = e.parameter.isAdmin === 'true';
 
     const tabs = [
+      { name: 'VehicleData', dateCol: 'Date', storeCol: 'SiteCode', lpaCol: 'LPA', catCol: 'ReceivedType', valCol: 'InvoiceValue' },
       { name: 'ReceivingExceptions', dateCol: 'StockReceivingDate', storeCol: 'SiteCode', lpaCol: 'LpaName', catCol: '', valCol: 'TotalValue' },
       { name: 'FloorWalk', dateCol: 'Date', storeCol: 'Store', lpaCol: 'LpaName', catCol: 'DiscrepancyCategory', valCol: 'TotalValue' },
       { name: 'RegisterValidation', dateCol: 'Date', storeCol: 'StoreCode', lpaCol: 'CheckingLpaName', catCol: 'RegisterName', valCol: 'ExceptionValue' },
       { name: 'QcJioExceptions', dateCol: 'Date', storeCol: 'StoreCode', lpaCol: 'LpaName', catCol: '', valCol: 'TotalValue' },
       { name: 'FashionExceptions', dateCol: 'Date', storeCol: 'StoreCode', lpaCol: 'LpaName', catCol: '', valCol: 'TotalValue' },
-      { name: 'IncidentLogs', dateCol: 'Date', storeCol: 'StoreCode', lpaCol: 'LpaName', catCol: 'ExceptionType', valCol: 'TotalValue' }
+      { name: 'IncidentLogs', dateCol: 'Date', storeCol: 'StoreCode', lpaCol: 'LpaName', catCol: 'ExceptionType', valCol: 'TotalValue' },
+      { name: 'SegmentCount', dateCol: 'Date', storeCol: 'SiteCode', lpaCol: 'LpaName', catCol: 'Segment', valCol: 'OverallShrinkValue' },
+      { name: 'ShortPick', dateCol: 'Date', storeCol: 'StoreCode', lpaCol: 'LpaName', catCol: 'Reason', valCol: 'ShortValue' },
+      { name: 'VehInwards', dateCol: 'Date', storeCol: 'SiteCode', lpaCol: 'LPA', catCol: 'ReceivedType', valCol: 'InvoiceValue' }
     ];
 
     let totalExceptions = 0;
     const dateWise = {};
     const moduleWise = {};
     const adminData = [];
+    const vehicleStats = { totalCount: 0, totalValue: 0, types: { 'CPC': 0, 'DC': 0, 'DSD': 0, 'IST': 0, 'Other': 0 } };
+
 
     tabs.forEach(tab => {
       const sheet = ss.getSheetByName(tab.name);
@@ -59,87 +78,127 @@ function doGet(e) {
         const lastCol = sheet.getLastColumn();
         if (lastRow > 1) {
           const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-          const headers = values[0].map(h => String(h).replace(/\s+/g, '').toLowerCase());
+          const rawHeaders = values[0].map(h => String(h).trim());
+          const cleanHeaders = rawHeaders.map(h => h.replace(/\s+/g, '').toLowerCase());
           
-          let dateIndex = -1, userIndex = -1, storeIdx = -1, lpaIdx = -1, catIdx = -1, valIdx = -1;
-          const targetDateKey = tab.dateCol.toLowerCase();
-          
-          headers.forEach((h, i) => {
-            if (h === targetDateKey || (dateIndex === -1 && h.includes('date'))) dateIndex = i;
-            if (h === 'submittedby') userIndex = i;
-            if (h === tab.storeCol.toLowerCase() || (storeIdx === -1 && (h.includes('store') || h.includes('sitecode')))) storeIdx = i;
-            if (tab.lpaCol && h === tab.lpaCol.toLowerCase()) lpaIdx = i;
-            if (tab.catCol && h === tab.catCol.toLowerCase()) catIdx = i;
-            if (h === tab.valCol.toLowerCase() || (valIdx === -1 && h.includes('value'))) valIdx = i;
-          });
+          const findIdx = (target) => {
+            if (!target) return -1;
+            const tClean = target.replace(/\s+/g, '').toLowerCase();
+            let idx = cleanHeaders.indexOf(tClean);
+            if (idx !== -1) return idx;
+            // Robust check: if exact match fails, try containment
+            return cleanHeaders.findIndex(h => h.includes(tClean) || tClean.includes(h)); 
+          };
+
+          let dateIndex = findIdx(tab.dateCol);
+          let userIndex = findIdx('submittedby');
+          let storeIdx = findIdx(tab.storeCol);
+          let lpaIdx = findIdx(tab.lpaCol);
+          let catIdx = findIdx(tab.catCol);
+          let valIdx = findIdx(tab.valCol);
+
+          // Fallbacks for date and store
+          if (dateIndex === -1) dateIndex = cleanHeaders.findIndex(h => h.includes('date'));
+          if (storeIdx === -1) storeIdx = cleanHeaders.findIndex(h => h.includes('store') || h.includes('sitecode'));
+          if (valIdx === -1) valIdx = cleanHeaders.findIndex(h => (h.includes('value') || h.includes('val')) && !h.includes('map'));
 
           for (let i = 1; i < values.length; i++) {
-            const rowUser = String(values[i][userIndex] || '').trim().toLowerCase();
+            const rowUser = userIndex !== -1 ? String(values[i][userIndex] || '').trim().toLowerCase() : '';
             
-            if (!isAdmin && filterEmpCode && userIndex !== -1) {
+            if (!isAdmin && filterEmpCode) {
                 if (rowUser !== filterEmpCode) continue;
             }
 
             let dateVal = 'Unknown Date';
             if (dateIndex !== -1 && values[i][dateIndex]) {
                try {
-                 const d = new Date(values[i][dateIndex]);
+                 const rawDate = values[i][dateIndex];
+                 const d = (rawDate instanceof Date) ? rawDate : new Date(rawDate);
                  if (!isNaN(d.getTime())) {
                    const yyyy = d.getFullYear();
                    const mm = String(d.getMonth() + 1).padStart(2, '0');
                    const dd = String(d.getDate()).padStart(2, '0');
                    dateVal = `${yyyy}-${mm}-${dd}`;
                  } else {
-                   dateVal = String(values[i][dateIndex]).trim();
+                   dateVal = String(rawDate).trim();
                  }
                } catch(e) {
                  dateVal = String(values[i][dateIndex]).trim();
                }
             }
 
-            if (isAdmin) {
-               let catVal = tab.name;
-               if (catIdx !== -1 && values[i][catIdx]) catVal = String(values[i][catIdx]);
-
-               adminData.push({
-                   date: dateVal,
-                   store: storeIdx !== -1 ? String(values[i][storeIdx]) : 'Unknown',
-                   lpa: lpaIdx !== -1 ? String(values[i][lpaIdx]) : 'Unknown',
-                   category: catVal,
-                   value: valIdx !== -1 ? parseFloat(values[i][valIdx]) || 0 : 0,
-                   empCode: userIndex !== -1 ? String(values[i][userIndex]) : 'Unknown',
-                   module: tab.name
-               });
-            } else {
-               totalExceptions++;
-               if (!dateWise[dateVal]) dateWise[dateVal] = 0;
-               dateWise[dateVal]++;
-               
-               if (!moduleWise[tab.name]) moduleWise[tab.name] = 0;
-               moduleWise[tab.name]++;
+            // Numeric value parsing with robust cleanup
+            const rawVal = values[i][valIdx];
+            let numVal = 0;
+            if (typeof rawVal === 'number') {
+              numVal = rawVal;
+            } else if (rawVal) {
+              // Removes currency symbols, commas, and hidden spaces
+              const cleaned = String(rawVal).replace(/[₹\s,]/g, '').trim();
+              numVal = parseFloat(cleaned) || 0;
             }
+
+            // COMPATIBILITY BRIDGE: Sending both long and short labels
+            const record = {
+                date: String(dateVal || '').trim() || 'Unknown Date',
+                store: (storeIdx !== -1 && values[i][storeIdx]) ? String(values[i][storeIdx]).trim() : 'Unknown',
+                lpa: (lpaIdx !== -1 && values[i][lpaIdx]) ? String(values[i][lpaIdx]).trim() : 'Unknown',
+                
+                // FIXED: Use tab name as category if column is empty
+                category: (catIdx !== -1 && values[i][catIdx]) ? String(values[i][catIdx]).trim() : tab.name,
+                
+                // Long labels (Standard)
+                value: numVal,
+                empCode: (userIndex !== -1 && values[i][userIndex]) ? String(values[i][userIndex]).trim() : 'Unknown',
+                module: tab.name || 'Unknown',
+                
+                // Short labels (Compatibility for older app versions)
+                val: numVal,
+                user: (userIndex !== -1 && values[i][userIndex]) ? String(values[i][userIndex]).trim() : 'Unknown',
+                mod: tab.name,
+                cat: (catIdx !== -1 && values[i][catIdx]) ? String(values[i][catIdx]).trim() : tab.name
+            };
+
+            adminData.push(record);
+
+            if (!isAdmin) {
+                totalExceptions++;
+                if (!dateWise[dateVal]) dateWise[dateVal] = 0;
+                dateWise[dateVal]++;
+                
+                if (!moduleWise[tab.name]) moduleWise[tab.name] = 0;
+                moduleWise[tab.name]++;
+            }
+
+
+            // Update Vehicle Stats if this is the vehicle sheet
+            if (tab.name === 'VehicleData') {
+                vehicleStats.totalCount++;
+                vehicleStats.totalValue += numVal;
+                let typeVal = 'Other';
+                if (catIdx !== -1 && values[i][catIdx]) {
+                    const t = String(values[i][catIdx]).trim();
+                    if (t in vehicleStats.types) typeVal = t;
+                }
+                vehicleStats.types[typeVal]++;
+            }
+
+
           }
         }
       }
     });
 
-    if (isAdmin) {
-       return createResponse({ status: 'success', data: { adminData: adminData } });
-    }
 
-    // Sort dates
-    const sortedDates = Object.keys(dateWise).sort((a,b) => b.localeCompare(a)).reduce((obj, key) => { 
-      obj[key] = dateWise[key]; 
-      return obj;
-    }, {});
 
-    // Sort modules by count
-    const sortedModules = Object.keys(moduleWise).sort((a,b) => moduleWise[b] - moduleWise[a]).reduce((obj, key) => {
-      obj[key] = moduleWise[key];
-      return obj;
-    }, {});
 
-    return createResponse({ status: 'success', data: { total: totalExceptions, dateWise: sortedDates, moduleWise: sortedModules } });
+    // Return adminData for both Admin and Staff (Staff view is filtered above)
+    return createResponse({ status: 'success', data: { 
+      total: totalExceptions, 
+      adminData: adminData,
+      vehicleStats: vehicleStats 
+    } });
+
   }
 
   const saveActions = {
@@ -197,15 +256,20 @@ function doGet(e) {
                 return getVal('DiscrepancyCategory') || getVal(key) || getVal(h);
             }
 
+            if (keyLower === 'employeeid' || keyLower === 'empid') return getVal('EmpID') || getVal(key) || getVal(h);
+            if (keyLower === 'employeename' || keyLower === 'empname') return getVal('EmpName') || getVal(key) || getVal(h);
+
             // Auto-fallback for "Quantity" variations
             if (keyLower === 'qty' || keyLower === 'quantity' || keyLower === 'quantities') {
                 return getVal('Quantity') || getVal(key) || getVal(h);
             }
 
             // Auto-fallback for "Involved EMP" / Employee / Incident variations
-            if (keyLower.includes('empname') || keyLower.includes('empid') || keyLower.includes('employeename') || keyLower.includes('employeecode')) {
-                if (keyLower.includes('name')) return getVal('EmpName') || getVal('InvolvedEmpName') || getVal(key) || getVal(h);
-                if (keyLower.includes('id') || keyLower.includes('code')) return getVal('EmpID') || getVal('InvolvedEmpCode') || getVal(key) || getVal(h);
+            if (['modid', 'pickerid', 'managerid', 'involvedpersonid', 'responsibilitypersonemployeeid', 'employeeid', 'empid', 'involvedempcode'].includes(keyLower)) {
+                return getVal('EmpID') || getVal(key) || getVal(h);
+            }
+            if (['modname', 'pickername', 'managername', 'involvedpersonname', 'responsibilitypersonemployeename', 'employeename', 'empname', 'involvedempname'].includes(keyLower)) {
+                return getVal('EmpName') || getVal(key) || getVal(h);
             }
 
             return getVal(key) || getVal(h);
@@ -214,6 +278,37 @@ function doGet(e) {
         sheet.appendRow(rowData);
     }
     
+    
+    // NEW LOGIC TO SAVE TO EMPLOYEE DATA SHEET
+    const empId = String(e.parameter.EmpID || '').trim();
+    const empName = String(e.parameter.EmpName || '').trim();
+    if (empId && empName) {
+        let empSheet = ss.getSheetByName('Employee data');
+        if (!empSheet) {
+            createSheetWithHeaders(ss, 'Employee data');
+            empSheet = ss.getSheetByName('Employee data');
+        }
+        if (empSheet) {
+            const data = empSheet.getDataRange().getValues();
+            let found = false;
+            let rowIndex = -1;
+            for (let i = 1; i < data.length; i++) {
+                if (String(data[i][0]).trim() === empId) {
+                    found = true;
+                    rowIndex = i + 1;
+                    break;
+                }
+            }
+            if (!found) {
+                empSheet.appendRow([empId, empName]);
+            } else if (rowIndex > 1 && data[rowIndex-1]) {
+                if (String(data[rowIndex-1][1]).trim() !== empName) {
+                    empSheet.getRange(rowIndex, 2).setValue(empName);
+                }
+            }
+        }
+    }
+
     return createResponse({ status: 'success', message: 'Saved ' + noOfItems + ' records to ' + sheetName });
   }
 
@@ -225,14 +320,15 @@ function createSheetWithHeaders(ss, sheetName) {
   const headersMap = {
     //  ↓ FIXED: 'SendingSiteCode' renamed to 'Sending Site' to match frontend field (SendingSite after space-strip)
     'VehicleData':         ['Timestamp','SubmittedBy','LPA','InwardNumber','Date','ReceivedType','SiteCode','SiteName','VehicleNo','TripNo','Sending Site','InvoiceNumber','InvoiceValue','StnQty','HuQty','HuReceived','HuDamaged','HuShort','MicroCheck','GrnStatus','ShortValue','DamagedValue','NearExpiredValue','ExpiredValue'],
-    'ReceivingExceptions': ['Timestamp','SubmittedBy','LpaName','StockReceivingDate','SendingDCCode','SiteCode','TripNo','TripDate','VehicleNo','STNNo','DeliveryNo','HUNo','ArticleCode','EnaCode','ArticleDescription','MapPerPiece','HuQty','ReceivedQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','NoOfException','NoOfDiscrepantEaches','TotalValue','Remarks'],
-    'FloorWalk':           ['Timestamp','SubmittedBy','Store','Date','LpaName','Location','ArticleCode','EanCode','ArticleDescription','EaValueMap','DiscrepancyCategory','Quantity','CalculatedValue','TotalQty','TotalValue'],
-    'RegisterValidation':  ['Timestamp','SubmittedBy','StoreCode','Date','BusinessType','RegisterName','CheckingLpaName','NoOfException','ArticleCode','EanCode','ArticleDescription','MapPerPiece','RegisterQty','DocumentQuantity','ExceptionQty','ExceptionValue','OthersRemarks'],
-    'QcJioExceptions':     ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OrderNo','PickerID','PickerName','ArticleCode','EanCode','ArticleDescription','InvoiceQty','PackQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','ExpireVal','TotalDiscrepantEaches','MapPerPiece','TotalValue','Remarks'],
-    'FashionExceptions':   ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','Location','ArticleCode','EanCode','ArticleDescription','NoHardtagQty','NoHardtagVal','DamagedQty','DamageVal','GrazingQty','GrazingVal','MapPerPiece','TotalValue','Remarks'],
-    'IncidentLogs':        ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','ExceptionType','NoOfException','EmpName','EmpID','BilledNo','RposID','CustomerName','CustomerGender','LocationFound','EanCode','ArticleCode','ArticleDescription','Quantity','MapPerPiece','TotalValue'],
-    'SegmentCount':        ['Timestamp','SubmittedBy','SiteCode','Date','LpaName','Segment','Category','OverallSystemQty','OverallPhysicalQty','OverallDifferenceQty','OverallShrinkValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','VarianceValue'],
-    'ShortPick':           ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OverallShortOrders','OverallShortQty','OverallShortValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','ShortValue','Reason']
+    'ReceivingExceptions': ['Timestamp','SubmittedBy','LpaName','StockReceivingDate','SendingDCCode','SiteCode','TripNo','TripDate','VehicleNo','STNNo','DeliveryNo','HUNo','MOD ID','MOD Name','ArticleCode','EnaCode','ArticleDescription','MapPerPiece','HuQty','ReceivedQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','NoOfException','NoOfDiscrepantEaches','TotalValue','Remarks'],
+    'FloorWalk':           ['Timestamp','SubmittedBy','Store','Date','LpaName','Location','Responsibility Person Employee ID','Responsibility Person Employee Name','ArticleCode','EanCode','ArticleDescription','EaValueMap','DiscrepancyCategory','Quantity','CalculatedValue','TotalQty','TotalValue'],
+    'RegisterValidation':  ['Timestamp','SubmittedBy','StoreCode','Date','BusinessType','RegisterName','CheckingLpaName','Involved Person ID','Involved Person Name','NoOfException','ArticleCode','EanCode','ArticleDescription','MapPerPiece','RegisterQty','DocumentQuantity','ExceptionQty','ExceptionValue','OthersRemarks'],
+    'QcJioExceptions':     ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OrderNo','Picker ID','Picker Name','TotalValueOfOrder','ArticleCode','EanCode','ArticleDescription','InvoiceQty','PackQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','ExpireVal','TotalDiscrepantEaches','MapPerPiece','TotalValue','Remarks'],
+    'FashionExceptions':   ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','Location','Responsibility Person Employee ID','Responsibility Person Employee Name','ArticleCode','EanCode','ArticleDescription','NoHardtagQty','NoHardtagVal','DamagedQty','DamageVal','GrazingQty','GrazingVal','MapPerPiece','TotalValue','Remarks'],
+    'IncidentLogs':        ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','ExceptionType','NoOfException','Employee Name','Employee ID','BilledNo','RposID','CustomerName','CustomerGender','LocationFound','EanCode','ArticleCode','ArticleDescription','Quantity','MapPerPiece','TotalValue'],
+    'SegmentCount':        ['Timestamp','SubmittedBy','SiteCode','Date','LpaName','Segment','Category','Manager ID','Manager Name','OverallSystemQty','OverallPhysicalQty','OverallDifferenceQty','OverallShrinkValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','VarianceValue'],
+    'ShortPick':           ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OverallShortOrders','OverallShortQty','OverallShortValue','Employee ID','Employee Name','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','ShortValue','Reason'],
+    'Employee data':       ['Employee ID', 'Employee Name']
   };
 
   const headers = headersMap[sheetName];
@@ -245,7 +341,7 @@ function createSheetWithHeaders(ss, sheetName) {
 // Run this ONCE from the editor to build all sheets
 function initialSetup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetNames = ['VehicleData','ReceivingExceptions','FloorWalk','RegisterValidation','QcJioExceptions','FashionExceptions','IncidentLogs','Employees','JS Master','SegmentCount','ShortPick'];
+  const sheetNames = ['VehicleData','ReceivingExceptions','FloorWalk','RegisterValidation','QcJioExceptions','FashionExceptions','IncidentLogs','Employees','JS Master','SegmentCount','ShortPick', 'Employee data'];
   sheetNames.forEach(name => {
     if (!ss.getSheetByName(name)) createSheetWithHeaders(ss, name);
   });
