@@ -272,6 +272,18 @@ function doGet(e) {
                 return getVal('EmpName') || getVal(key) || getVal(h);
             }
 
+            if (keyLower === 'totalvalueoforder') {
+                return getVal('Total Value of Order') || getVal('TotalValueOfOrder') || getVal(key) || getVal(h);
+            }
+
+            if (keyLower === 'totalvalue') {
+                return getVal('TotalValue') || getVal(key) || getVal(h);
+            }
+
+            if (keyLower === 'mapperpiece') {
+                return getVal('MapPerPiece') || getVal(key) || getVal(h);
+            }
+
             return getVal(key) || getVal(h);
         });
 
@@ -323,7 +335,7 @@ function createSheetWithHeaders(ss, sheetName) {
     'ReceivingExceptions': ['Timestamp','SubmittedBy','LpaName','StockReceivingDate','SendingDCCode','SiteCode','TripNo','TripDate','VehicleNo','STNNo','DeliveryNo','HUNo','MOD ID','MOD Name','ArticleCode','EnaCode','ArticleDescription','MapPerPiece','HuQty','ReceivedQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','NoOfException','NoOfDiscrepantEaches','TotalValue','Remarks'],
     'FloorWalk':           ['Timestamp','SubmittedBy','Store','Date','LpaName','Location','Responsibility Person Employee ID','Responsibility Person Employee Name','ArticleCode','EanCode','ArticleDescription','EaValueMap','DiscrepancyCategory','Quantity','CalculatedValue','TotalQty','TotalValue'],
     'RegisterValidation':  ['Timestamp','SubmittedBy','StoreCode','Date','BusinessType','RegisterName','CheckingLpaName','Involved Person ID','Involved Person Name','NoOfException','ArticleCode','EanCode','ArticleDescription','MapPerPiece','RegisterQty','DocumentQuantity','ExceptionQty','ExceptionValue','OthersRemarks'],
-    'QcJioExceptions':     ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OrderNo','Picker ID','Picker Name','TotalValueOfOrder','ArticleCode','EanCode','ArticleDescription','InvoiceQty','PackQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','ExpireVal','TotalDiscrepantEaches','MapPerPiece','TotalValue','Remarks'],
+    'QcJioExceptions':     ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','OrderNo','Picker ID','Picker Name','Total Value of Order','ArticleCode','EanCode','ArticleDescription','InvoiceQty','PackQty','Excess','ExcessVal','Short','ShortVal','Damaged','DamageVal','NearExpired','NearExpiryVal','Expired','ExpireVal','TotalDiscrepantEaches','MapPerPiece','TotalValue','Remarks'],
     'FashionExceptions':   ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','Location','Responsibility Person Employee ID','Responsibility Person Employee Name','ArticleCode','EanCode','ArticleDescription','NoHardtagQty','NoHardtagVal','DamagedQty','DamageVal','GrazingQty','GrazingVal','MapPerPiece','TotalValue','Remarks'],
     'IncidentLogs':        ['Timestamp','SubmittedBy','StoreCode','Date','LpaName','ExceptionType','NoOfException','Employee Name','Employee ID','BilledNo','RposID','CustomerName','CustomerGender','LocationFound','EanCode','ArticleCode','ArticleDescription','Quantity','MapPerPiece','TotalValue'],
     'SegmentCount':        ['Timestamp','SubmittedBy','SiteCode','Date','LpaName','Segment','Category','Manager ID','Manager Name','OverallSystemQty','OverallPhysicalQty','OverallDifferenceQty','OverallShrinkValue','NoOfItems','ArticleCode','EanCode','ArticleDescription','SystemCount','PhysicalCount','Variance','VarianceValue'],
