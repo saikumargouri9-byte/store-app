@@ -1,4 +1,4 @@
-const CACHE_NAME = 'storepro-v9.9';
+const CACHE_NAME = 'storepro-v10.0';
 const ASSETS = [
     './',
     './index.html',
@@ -25,20 +25,23 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// Fetch: serve from cache, fallback to network
+// Fetch: Network first, fallback to cache
 self.addEventListener('fetch', event => {
     // Skip non-GET and cross-origin (Google Apps Script) requests
     if (event.request.method !== 'GET') return;
     if (event.request.url.includes('script.google.com')) return;
 
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            return cached || fetch(event.request).then(response => {
-                // Cache new assets dynamically
-                const clone = response.clone();
-                caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                return response;
+        fetch(event.request).then(response => {
+            // Valid response from network, dynamically update cache
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+            return response;
+        }).catch(() => {
+            // If offline or network fails, fallback to cache
+            return caches.match(event.request).then(cached => {
+                return cached || caches.match('./index.html');
             });
-        }).catch(() => caches.match('./index.html'))
+        })
     );
 });
