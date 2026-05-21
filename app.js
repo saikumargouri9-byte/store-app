@@ -1196,7 +1196,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // For Unbilled tab, ignore fields that are currently hidden
             if (form.id === 'unbilledForm') {
                 const type = data.ExceptionType;
-                if (type === 'Unbilled' && ['CustomerName', 'CustomerGender', 'LocationFound'].includes(key)) continue;
+                if (type === 'Unbilled') {
+                    if (['CustomerName', 'CustomerGender', 'LocationFound'].includes(key)) continue;
+                    // Custom validation since native HTML required was removed
+                    if (key === 'EmpID' && !val) { missing.push('Employee ID'); continue; }
+                    if (key === 'EmpName' && !val) { missing.push('Employee Name'); continue; }
+                }
                 if (type === 'Thefting') {
                     if (['EmpName', 'EmpID', 'BilledNo', 'RposID'].includes(key)) continue;
                     // Custom validation since native HTML required was removed
