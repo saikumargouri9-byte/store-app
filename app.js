@@ -1,4 +1,6 @@
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxiPPRUioXf83OuxVkf8v5ocCLoiV8_hwth45kxa-TcgyoUBYFETKHShPo4lO5cEws/exec';
+const SCRIPT_URL = (typeof GAS_SCRIPT_URL !== 'undefined' && GAS_SCRIPT_URL && !GAS_SCRIPT_URL.startsWith('<?'))
+    ? GAS_SCRIPT_URL
+    : 'https://script.google.com/macros/s/AKfycbxiPPRUioXf83OuxVkf8v5ocCLoiV8_hwth45kxa-TcgyoUBYFETKHShPo4lO5cEws/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("App Initializing...");

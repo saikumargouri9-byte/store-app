@@ -1,9 +1,14 @@
 function doGet(e) {
-  if (!e || !e.parameter) {
-    return ContentService.createTextOutput("System Active.").setMimeType(ContentService.MimeType.TEXT);
+  // Serve the PWA frontend if no API action is requested
+  const action = e && e.parameter ? e.parameter.action : null;
+  if (!action) {
+    return HtmlService.createTemplateFromFile('index')
+      .evaluate()
+      .setTitle('Store Pro - Reliance Retail')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+      .setXFrameOptionsMode(HtmlService.SandboxMode.IFRAME);
   }
 
-  const action = e.parameter.action;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   if (action === 'login') {
